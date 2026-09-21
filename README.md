@@ -50,7 +50,7 @@ docs/
   02-architecture.md  system design, API contract, DB schema
   03-phone-hardware.md device build: jailbreak, TrollStore, SSH, automation layer
   04-evony-flow.md  game mechanics + calibration/OCR targets
-  05-security.md   hashed emails, code handling, ops guidelines
+  05-security.md   email storage, code handling, ops guidelines
   06-runbook.md    bring-up, USB transport, troubleshooting
 driver/            Python home agent (starter skeleton)
 webapp/            cloud app scaffold notes + API/DB contract

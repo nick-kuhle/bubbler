@@ -34,7 +34,7 @@ USB link to the phone and does the physical work), and the phone is the "player"
 - **NextJS** on Vercel, PostgreSQL for storage (can start with anything the team prefers —
   SQLite/Postgres both fine; contract is what matters).
 - Responsibilities:
-  - Hashed-password auth + operator flag.
+  - Email-based auth (email is the login) + operator flag.
   - Linking wizard, master list, dashboards.
   - Stores schedules; exposes an API the agent polls.
   - Records runs reported by the agent, stores evidence screenshots (e.g. object storage).
@@ -62,7 +62,7 @@ USB link to the phone and does the physical work), and the phone is the "player"
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/jobs/due` | List due jobs (account ref, evony name, schedule slot). Agent claims one (atomic lease). |
+| `GET` | `/jobs/due` | List due jobs (account ref, email, evony name, schedule slot). Agent claims one (atomic lease). |
 | `POST` | `/runs` | Report result: `user_id, status(ok/failed/needs_code), evidence_ref, shield_hours_remaining, duration_ms`. |
 | `POST` | `/runs/{id}/evidence` | Upload evidence screenshot. |
 | `GET` | `/accounts/{id}/re-link-status` | Whether account needs a fresh 6-digit code. |
@@ -70,8 +70,8 @@ USB link to the phone and does the physical work), and the phone is the "player"
 ## Database schema (starter)
 
 ```
-users       id, evony_name (plaintext), evony_email_hash, email_salt,
-            password_hash, is_operator, created_at
+users       id, email (plaintext, unique — app login + Evony login), evony_name,
+            is_operator, created_at
 schedules   id, user_id, weekdays (bitmask/ints), time (HH:MM), gem_ack (ts), active
 runs        id, user_id, triggered_at, trigger_type (scheduled/manual),
             status (pending/ok/failed/needs_code), evidence_ref,
@@ -79,7 +79,8 @@ runs        id, user_id, triggered_at, trigger_type (scheduled/manual),
 re_link     id, user_id, requested_at, code_status (needs_code/code_used), active
 ```
 
-Emails are **salted-hash only**. Codes live in memory during linking and are discarded.
+Emails are stored in plaintext (they are the app login and are typed into the game per run).
+Codes live in memory during linking and are discarded.
 
 ## Config / secrets
 

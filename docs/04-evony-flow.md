@@ -28,7 +28,7 @@ claim job (GET /jobs/due)
   ├─ launch Evony
   ├─ state check: "on the post-login world view?"
   │     ├─ no, code prompt shown → abort as needs_code (surface re-link)
-  │     └─ no, not logged in → type email; if code prompt appears → abort as needs_code
+  │     └─ no, not logged in → type email (fetched from the job payload); if code prompt appears → abort as needs_code
   ├─ navigate: open shield/bubble item → select 3-day Truce (7500💎) → Activate → Confirm
   ├─ verify: screenshot → shield indicator present AND countdown readout ≥ 3 days − ε
   ├─ close Evony (back to home screen)

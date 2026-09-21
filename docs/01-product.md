@@ -15,14 +15,15 @@ their Evony account once, pick Mon/Wed/Fri-style schedules, and the system appli
 
 ## Core feature set
 
-### 1. Password auth (hashed)
-- All users authenticate with a password (salted hash). Operator flag on the operator account.
+### 1. Email login
+- All users sign in with their linked Evony email (no password). Operator flag on the operator account.
 
 ### 2. 5-step linking wizard
 1. **Instructions** — explain linking a new Evony account.
 2. **Two inputs**:
    - *"Please enter your Evony name"* — plaintext; this is the human key shown on the master list.
-   - *"Enter your Evony email"* — **salted-hash at rest only**; never stored or logged raw.
+   - *"Enter your Evony email"* — stored in plaintext; doubles as the app login and is
+     typed into the game on each automated run.
 3. **Six-digit code** — the code Evony emailed (entered once to log in, kept in memory only,
    discarded after use).
 4. **Schedule + gem acknowledgment** — pick weekdays/time (default Mon/Wed/Fri) and check a
@@ -31,12 +32,12 @@ their Evony account once, pick Mon/Wed/Fri-style schedules, and the system appli
 
 Privacy copy on the app (wizard + footer), verbatim:
 
-> Your Evony email is encrypted and stored as a hash only. We never store your raw email or
-> credentials, and the 6-digit code is used once and discarded.
+> Your Evony email is stored so we can sign you in and apply your scheduled bubbles. The
+> 6-digit code is used once and never stored.
 
 ### 3. Master list (operator only)
 Table of **Evony name · schedule (days/time) · next scheduled run · last-run status**.
-Emails are never shown (they are hashes). This is how friends are told their slot is coming.
+Emails are never shown to other users. This is how friends are told their slot is coming.
 
 ### 4. Dashboard (per user)
 - Link status, schedule editor, next-run ETA, last-run result + evidence screenshot,
@@ -66,4 +67,4 @@ Emails are never shown (they are hashes). This is how friends are told their slo
 
 - HTTPS whenever exposed outside the LAN (or run behind Tailscale).
 - Runs are short (target a few minutes), 3x/week — keep idle footprint ~zero.
-- No plaintext emails or credentials anywhere in storage or logs.
+- Emails live in the app DB and are sent to the phone per-run over HTTPS; the 6-digit code is never stored or logged.
