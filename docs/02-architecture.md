@@ -1,95 +1,75 @@
-# 02 — Architecture
+```mermaid
+graph TD
+    subgraph PHONE["Jailbroken iPhone XR (always-on, on WiFi)"]
+        AGENT["phone-agent/agent.py<br/>long-poll loop"]
+        EVON["Hermes Touch (localhost:8887)<br/>tap/type/screenshot/typeText"]
+        APP["Evony app (real client)"]
+        AGENT -->|drives via HTTP| EVON
+        EVON -->|taps/types| APP
+    end
 
-## System overview
+    subgraph CLOUD["Vercel (serverless) + Postgres"]
+        API["NextJS /api<br/>auth · wizard · master list"]
+        LONGPOLL["GET /api/agent/events (hold 45s)"]
+        SCHED["Schedules table"]
+        RUNS["runs + evidence (Blob)"]
+        API --> LONGPOLL
+        API --> SCHED
+        API --> RUNS
+    end
 
-```
-                ┌─────────────────────────────────────────────┐
-                │   CLOUD — Vercel (NextJS + Postgres)       │
-                │   auth · wizard · schedules · master list   │
-                │   REST API for the agent                    │
-                └──────────────┬──────────────────────────────┘
-                               │  agent polls: GET /jobs/due   (≈1/min)
-                               │  agent reports: POST /runs    (status, evidence)
-                               ▼
-                ┌─────────────────────────────────────────────┐
-                │   HOME AGENT — Python, always-on (N150)     │
-                │   run lock · OpenCV + tesseract verify      │
-                │   usbmuxd → iproxy → SSH → Hermes Touch     │
-                └──────────────┬──────────────────────────────┘
-                               │  USB cable (no WiFi dependency)
-                               ▼
-                ┌─────────────────────────────────────────────┐
-                │   DEVICE — jailbroken iPhone XR             │
-                │   Evony TKR (real app, real account)        │
-                │   Hermes Touch HTTP API (tap/type/screen)   │
-                └─────────────────────────────────────────────┘
+    PHONE -- HTTPS long-poll outbound --> LONGPOLL
+    PHONE -- POST evidence --> RUNS
+    USER["Member browser"] --> API
 ```
 
-The cloud is the "brain" (schedules, auth, people), the agent is the "hands" (it owns the
-USB link to the phone and does the physical work), and the phone is the "player".
+## 01 — Cloud (Vercel, NextJS + Postgres + Blob)
 
-## Components
+Everything user-visible lives here: email-login (unhashed email is both the app login and
+the Evony login, per docs/01), linking wizard, master list (operator-only), per-user
+dashboards, schedules, run ledger, evidence screenshots.
 
-### Cloud (web app)
-- **NextJS** on Vercel, PostgreSQL for storage (can start with anything the team prefers —
-  SQLite/Postgres both fine; contract is what matters).
-- Responsibilities:
-  - Email-based auth (email is the login) + operator flag.
-  - Linking wizard, master list, dashboards.
-  - Stores schedules; exposes an API the agent polls.
-  - Records runs reported by the agent, stores evidence screenshots (e.g. object storage).
-  - "Re-link (new code)" action → sets the account into a state the agent will act on.
+### Data model (webapp/migrations/001_initial.sql)
 
-### Home agent (Python driver)
-- Always-on process on the N150; tiny footprint (<100 MB).
-- Polls the cloud every minute: `GET /jobs/due`. A job = one account + one scheduled apply.
-- **Run lock** — exactly one in-flight run globally.
-- Executes the run flow (see `04-evony-flow.md`) against the phone over USB, step-by-step
-  screen guards + retries, and reports `POST /runs` with status + evidence screenshot.
-- Vision: OpenCV template matching (reference screenshots/ROIs) + tesseract OCR for the
-  shield countdown readout.
+- `users` — id, email (plaintext, unique), evony_name, is_operator
+- `sessions` — token_hash (sha256 of raw token), user_id, expires_at
+- `link_events` — id, user_id, email, kind (link|code), status, expires_at (transient!)
+- `schedules` — id, user_id, weekdays (bitmask), time "HH:MM", gem_ack, active
+- `jobs` — id, kind (run|link|code), user_id, payload JSON, status, uniq (idempotency),
+  expires_at (code TTL/lease timing)
+- `runs` — id, user_id, trigger, status, shield_hours_remaining, evidence_ref, error
 
-### Phone (jailbroken iPhone XR)
-- Runs the real Evony app.
-- Exposes a control surface:
-  - **Current (working):** SSH over usbmuxd (`iproxy 4044:22`) for command execution.
-  - **Target:** **Hermes Touch** HTTP API over the same USB transport (port 8887) —
-    `POST /touch {"x","y"}`, `POST /typeText`, `GET /screenshot`. *Pending verification on
-    rootless Dopamine / A12; fallback AutoTouch or an accessibility-based tweak.*
-- Details in `docs/03-phone-hardware.md`.
+### Scheduler (no cron)
 
-## API contract (cloud ↔ agent)
+The cloud computes "what is due right now?" on each long-poll round (lib/scheduler.ts):
+Given `now` weekday + "HH:MM" in the cloud's schedule UTC, it materializes a `jobs.run` row
+for any schedule whose weekday bitmask + time equals now, guarded by the uniq key
+`run:{user_id}:{weekday}:{HH:MM}` so the same slot is never created twice.
 
-| Method | Path | Purpose |
+Events delivered over long-poll:
+
+| kind | when | payload |
 |---|---|---|
-| `GET` | `/jobs/due` | List due jobs (account ref, email, evony name, schedule slot). Agent claims one (atomic lease). |
-| `POST` | `/runs` | Report result: `user_id, status(ok/failed/needs_code), evidence_ref, shield_hours_remaining, duration_ms`. |
-| `POST` | `/runs/{id}/evidence` | Upload evidence screenshot. |
-| `GET` | `/accounts/{id}/re-link-status` | Whether account needs a fresh 6-digit code. |
+| `run` | schedule hit / operator "Run now" | email, evony_name, trigger |
+| `link` | wizard step 2 (new email) | email (type it in Evony) |
+| `code` | wizard step 3 (6 digits) + TTL | the code, link id, TTL (~85s) |
 
-## Database schema (starter)
+## 02 — Phone-agent (Python, on-device)
 
-```
-users       id, email (plaintext, unique — app login + Evony login), evony_name,
-            is_operator, created_at
-schedules   id, user_id, weekdays (bitmask/ints), time (HH:MM), gem_ack (ts), active
-runs        id, user_id, triggered_at, trigger_type (scheduled/manual),
-            status (pending/ok/failed/needs_code), evidence_ref,
-            shield_hours_remaining, duration_ms, error
-re_link     id, user_id, requested_at, code_status (needs_code/code_used), active
-```
+- `agent.py` — main loop: long-poll GET /api/agent/events; dispatch event; report via
+  POST /api/agent/runs.
+- `evony.py` — orchestration: launch Evony, guard each screen (email login → code dialog →
+  world view), apply 3-day Truce (7500 gems), verify countdown ≥3d, close.
+- `vision.py` — OpenCV template match + tesseract OCR on device.
+- `iphone/transport.py` — Hermes Touch HTTP client (localhost). No USB, no host machine.
+- Runs as a LaunchDaemon (bootstrap/com.bubbler.agent.plist) so it survives resprings between
+  bubbles.
 
-Emails are stored in plaintext (they are the app login and are typed into the game per run).
-Codes live in memory during linking and are discarded.
+The phone stays moderately online (long-poll hold ≈45s, reconnect ~instant). Evony is only
+opened when actually applying/verifying, then closed — the game is never left idling online.
 
-## Config / secrets
+## 03 — Transport
 
-- Agent config: `driver/config.example.yaml` (host, ports, usbmuxd pair) — commit the
-  example only, never real values.
-- Secrets (SSH password/token, DB URL, Vercel envs) live in vault/secrets tooling, not git.
-
-## Operational notes
-
-- No WiFi is required between agent and phone (USB only). The N150's built-in WiFi card is
-  currently unreliable — keep the driver on the wired/USB path.
-- Runs should be scheduled during windows the host is otherwise idle (small machine).
+- Phone → cloud: HTTPS (bearer token) — outbound only, survives NAT, no tunnel needed.
+- Phone → Evony: Hermes Touch over localhost HTTP (tap/type/screenshot).
+- Deployment: webapp → `vercel deploy --prod` (see 06-runbook); agent → ssh (setup only).

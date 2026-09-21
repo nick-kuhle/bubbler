@@ -5,13 +5,13 @@ __pycache__/
 venv/
 
 # Config with real secrets
-driver/config.yaml
+phone-agent/config.yaml
 .env
 *.pem
 *.key
 
 # Calibration images (large binaries — reference only via docs/ or a release)
-driver/calibration/*.png
+phone-agent/calibration/*.png
 
 # Evidence / downloads
 evidence/
@@ -26,3 +26,8 @@ downloads/
 # Logs
 *.log
 nohup.out
+
+# Node / webapp
+node_modules/
+.next/
+webapp/.env.local

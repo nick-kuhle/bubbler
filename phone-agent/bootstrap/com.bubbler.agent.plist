@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.bubbler.agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/var/jb/usr/bin/python3</string>
+        <string>/var/jb/usr/libexec/bubbler/agent.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/var/jb/usr/libexec/bubbler</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/var/jb/usr/bin:/var/jb/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/var/jb/usr/libexec/bubbler/agent.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/jb/usr/libexec/bubbler/agent.log</string>
+
+    <!-- The agent holds an HTTP long-poll; launchd's job-control timeout would kill it.
+         KeepAlive + no throttle means instant restart on crash, and the stays-alive
+         policy lets the loop hold its request without being reaped. -->
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
