@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Config with real secrets
+driver/config.yaml
+.env
+*.pem
+*.key
+
+# Calibration images (large binaries — reference only via docs/ or a release)
+driver/calibration/*.png
+
+# Evidence / downloads
+evidence/
+downloads/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Logs
+*.log
+nohup.out
