@@ -9,6 +9,11 @@ export type Lang = "en" | "es";
 
 export const SUPPORTED: Lang[] = ["en", "es"];
 
+// iScout-style: each language shown by its OWN native name + script line,
+// so French friends see "Français", your sister circle in Latin America sees
+// "Español". Adding one language = 1 line here + 1 dict block below.
+export const NATIVE: Record<Lang, string> = { en: "English", es: "Español" };
+
 export const LANG_COOKIE = "bubbler_lang";
 
 export const DEFAULT_LANG: Lang = "en";

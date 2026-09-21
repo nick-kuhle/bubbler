@@ -7,6 +7,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import { db } from "./db";
 import { nid, nowIso, addDaysIso } from "./id";
 
@@ -38,6 +39,31 @@ function rowToUser(r: Record<string, unknown>): CurrentUser {
 }
 
 /** Current user from the session cookie, or null. */
+/** The phone speaks `Authorization: Bearer <session-token>` in a HEADER, not a cookie.
+ * This is the session's twin: same sessions table, same token_hash, same expiry — just a
+ * different transport. The phone-agent (phone-agent/agent.py) reads nothing else. */
+export function bearerToken(req: NextRequest): string | null {
+  const h = req.headers.get("authorization");
+  if (!h) return null;
+  const m = /^Bearer\s+(.+)$/.exec(h);
+  return m ? m[1].trim() : null;
+}
+
+export async function verifyBearer(
+  req: NextRequest,
+): Promise<CurrentUser | null> {
+  const token = bearerToken(req);
+  if (!token) return null;
+  const d = db();
+  const row = await d.get(
+    `SELECT u.id, u.email, u.evony_name, u.is_operator
+       FROM sessions s JOIN users u ON u.id = s.user_id
+      WHERE s.token_hash = ? AND s.expires_at > ?`,
+    [sha256(token), nowIso()],
+  );
+  return row ? rowToUser(row) : null;
+}
+
 export async function currentUser(): Promise<CurrentUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
