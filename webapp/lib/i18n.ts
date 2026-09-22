@@ -10,11 +10,85 @@ export { Link } from "@/src/i18n/navigation";
 import en from "@/messages/en.json";
 import es from "@/messages/es.json";
 
-export type Lang = "en" | "es";
+export type Lang =
+  | "en"
+  | "es"
+  | "fr"
+  | "de"
+  | "it"
+  | "pt"
+  | "ru"
+  | "ja"
+  | "ko"
+  | "zh-CN"
+  | "zh-TW"
+  | "ar"
+  | "tr"
+  | "pl"
+  | "nl"
+  | "sv"
+  | "uk"
+  | "vi"
+  | "id"
+  | "ms"
+  | "th"
+  | "hi"
+  | "he"
+  | "fil";
 
-export const SUPPORTED: Lang[] = ["en", "es"];
+export const SUPPORTED: Lang[] = [
+  "en",
+  "es",
+  "fr",
+  "de",
+  "it",
+  "pt",
+  "ru",
+  "ja",
+  "ko",
+  "zh-CN",
+  "zh-TW",
+  "ar",
+  "tr",
+  "pl",
+  "nl",
+  "sv",
+  "uk",
+  "vi",
+  "id",
+  "ms",
+  "th",
+  "hi",
+  "he",
+  "fil",
+];
 
-export const NATIVE: Record<Lang, string> = { en: "English", es: "Español" };
+export const NATIVE: Record<Lang, string> = {
+  en: "English",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+  it: "Italiano",
+  pt: "Português",
+  ru: "Русский",
+  ja: "日本語",
+  ko: "한국어",
+  "zh-CN": "简体中文",
+  "zh-TW": "繁體中文",
+  ar: "العربية",
+  tr: "Türkçe",
+  pl: "Polski",
+  nl: "Nederlands",
+  sv: "Svenska",
+  uk: "Українська",
+  vi: "Tiếng Việt",
+  id: "Bahasa Indonesia",
+  ms: "Bahasa Melayu",
+  th: "ไทย",
+  hi: "हिन्दी",
+  he: "עברית",
+  fil: "Filipino",
+};
 
 export const LANG_COOKIE = "bubbler_lang";
 
