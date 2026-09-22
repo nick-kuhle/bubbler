@@ -1,23 +1,25 @@
-// app/api/master/route.ts — operator-only: every schedule + run, latest first (the
-// physical "master list" the wizard/phone cards describe). Read-only for the operator
-// surface; mutations go through the same API the agent uses.
-
+// app/api/master/route.ts — operator-only master list: every slot + run, latest first.
+// Per-slot model: each (day, time) row is listed separately — no weekdays mask.
 import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
+
 export async function GET() {
   const op = await requireOperator();
   const d = db();
-  const schedules = d.all(
-    `SELECT s.id, s.weekdays, s.time, s.gem_ack, s.active, u.email, u.evony_name
-       FROM schedules s JOIN users u ON u.id = s.user_id
-      ORDER BY u.evony_name, s.time`,
+  const slots = await d.all(
+    `SELECT s.id, s.weekday, s.time, s.user_id, u.evony_name, u.email, s.active
+       FROM slots s JOIN users u ON u.id = s.user_id
+      ORDER BY u.evony_name, s.weekday, s.time`,
   );
-  const runs = d.all(
-    `SELECT r.id, r.trigger, r.status, r.shield_hours_remaining, r.error, r.created_at, u.evony_name
+  const runs = await d.all(
+    `SELECT r.id, r.trigger, r.status, r.shield_hours_remaining, r.error, r.evidence_ref, r.created_at, u.evony_name
        FROM runs r JOIN users u ON u.id = r.user_id
       ORDER BY r.created_at DESC LIMIT 50`,
   );
-  return NextResponse.json({ operator: op.evony_name, schedules, runs });
+  return NextResponse.json({ operator: op.evony_name, slots, runs });
 }

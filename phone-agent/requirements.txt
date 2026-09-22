@@ -1,8 +1,1 @@
 requests>=2.31
-PyYAML>=6.0
-pydantic>=2.0
-# Vision deps are optional on-device until calibration exists. The agent runs in
-# no-verify mode without them. On the phone: pip install opencv-python pytesseract
-# (Procursus tesseract) or bridge to Apple Vision via a helper binary.
-opencv-python>=4.9 ; python_platform != "ios"
-pytesseract>=0.3.10 ; python_platform != "ios"

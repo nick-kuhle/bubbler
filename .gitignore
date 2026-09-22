@@ -14,7 +14,6 @@ phone-agent/config.yaml
 phone-agent/calibration/*.png
 
 # Evidence / downloads
-evidence/
 downloads/
 
 # OS / editor

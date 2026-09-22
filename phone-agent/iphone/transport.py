@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import time
 
 import requests
 
@@ -82,6 +83,11 @@ class HermesTouch:
         except HermesDown:
             pass
 
+    def force_close(self, bundle_id: str) -> None:
+        """Hard close: emit a HID cancel, then killall -9 the app by bundle id, and settle."""
+        self.home()
+        close_app(bundle_id)
+
 
 def wake_screen(command: str = "wake") -> None:
     """Best-effort wake (Hermes touch / iospinraw tweaks). No-op safe."""
@@ -92,7 +98,12 @@ def wake_screen(command: str = "wake") -> None:
 
 
 def close_app(bundle_id: str) -> None:
-    """Close the app via the selftest/running app mechanism if available; else no-op."""
-    # On iOS there is no portable `kill <app>`; Hermes / Accessibility tweaks handle this.
-    # This is a placeholder wired to the calibration plan (see docs/04).
-    log.info("close_app(%s): deferred to Hermes/accessibility implementation", bundle_id)
+    """Close the app by killing its processes on the jailbroken phone.
+
+    iOS has no portable `kill <app>`; from a root shell (Dopamine) `killall -9` by the
+    bundle id is the reliable force-close. Also tries the app-name leaf for cover.
+    """
+    leaf = bundle_id.rsplit(".", 1)[-1]
+    for name in (bundle_id, leaf, leaf.capitalize()):
+        subprocess.run(["killall", "-9", name], capture_output=True, check=False)
+    time.sleep(1)  # settle before the next launch

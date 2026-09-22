@@ -1,23 +1,22 @@
-// app/master/page.tsx — operator read-only view. Calls the one route that exists for it:
-// GET /api/master → { operator, schedules, runs }. Renders exactly those fields.
+// app/[locale]/master/page.tsx — operator read-only view. Calls the one route that exists for it:
+// GET /api/master → { operator, slots, runs }. Per-slot model: one row per (day, time).
 
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/lib/i18n";
 
 type MasterData = {
   operator: string;
-  schedules: Array<{
-    id: string; weekdays: number; time: string; gem_ack: number;
-    active: number; email: string; evony_name: string;
+  slots: Array<{
+    id: string; weekday: number; time: string; user_id: string;
+    evony_name: string; email: string; active: number;
   }>;
   runs: Array<{ kind: string; status: string; shield_hours_remaining: number | null; created_at: string; evony_name: string }>;
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const weekdayNames = (mask: number): string =>
-  DAYS.filter((_, i) => (mask & (1 << i)) !== 0).join(", ") || "none";
+const dayName = (weekday: number): string => DAYS[weekday - 1] ?? String(weekday);
 
 export default function Master() {
   const [data, setData] = useState<MasterData | null>(null);
@@ -43,21 +42,20 @@ export default function Master() {
         operator <strong>{data.operator}</strong> — every claimed job for the circle, newest first.
       </p>
 
-      <h3 style={{ marginTop: "1.2rem" }}>schedules</h3>
+      <h3 style={{ marginTop: "1.2rem" }}>slots</h3>
       <table>
-        <thead><tr><th>player</th><th>email</th><th>weekdays</th><th>time</th><th>3d-next</th><th>active</th></tr></thead>
+        <thead><tr><th>player</th><th>email</th><th>day</th><th>time</th><th>active</th></tr></thead>
         <tbody>
-          {data.schedules.map((s) => (
+          {data.slots.map((s) => (
             <tr key={s.id}>
               <td>{s.evony_name}</td>
               <td className="muted">{s.email}</td>
-              <td>{weekdayNames(s.weekdays)}</td>
+              <td>{dayName(s.weekday)}</td>
               <td>{s.time}</td>
-              <td>{s.gem_ack ? "acked" : "—"}</td>
               <td>{s.active ? "yes" : "no"}</td>
             </tr>
           ))}
-          {data.schedules.length === 0 && <tr><td colSpan={6} className="muted">no schedules yet</td></tr>}
+          {data.slots.length === 0 && <tr><td colSpan={5} className="muted">no slots yet</td></tr>}
         </tbody>
       </table>
 

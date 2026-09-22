@@ -3,15 +3,7 @@
 // surface: `await`. There is no sync path anymore.
 
 import { db } from "./db";
-import {
-  nid,
-  nowIso,
-  addDaysIso,
-  isoWeekday,
-  weekdayBit,
-  hhmm,
-  dayKeyUTC,
-} from "./id";
+import { nid, nowIso, addDaysIso, isoWeekday, hhmm, dayKeyUTC } from "./id";
 
 export type BubblerEvent = {
   job_id: string;
@@ -24,12 +16,11 @@ export type BubblerEvent = {
 
 type Row = Record<string, unknown>;
 
-const slot = (weekdays: number, wd: number) => (weekdays & weekdayBit(wd)) !== 0;
-
 /**
- * Insert one job per schedule whose weekday-bit matches today AND whose clock time equals
- * the current HH:MM — idempotent because the uniq partial index will not insert twice for
- * the same (user, day-key, clock) within the same materialized run.
+ * Insert one job per `slots` row that is due right now: active AND its own weekday ==
+ * today's ISO weekday AND its own time == the current HH:MM. Each slot carries its own
+ * time, so Mon 09:00 / Wed 09:00 / Fri 18:00 are three independent matches. Idempotent:
+ * the uniq partial index refuses a second job for the same (user, day-key, clock).
  */
 export async function fillDue(now: Date = new Date()): Promise<void> {
   const d = db();
@@ -37,19 +28,25 @@ export async function fillDue(now: Date = new Date()): Promise<void> {
   const hh = hhmm(now);
   const day = dayKeyUTC(now);
   const rows = (await d.all(
-    `SELECT s.id AS sid, s.user_id, s.weekdays, s.time, u.email, u.evony_name
-       FROM schedules s JOIN users u ON u.id = s.user_id
-      WHERE s.active = 1`,
-  )) as (Row & { sid: string; user_id: string; weekdays: number; time: string; email: string; evony_name: string })[];
+    `SELECT s.user_id, s.time
+       FROM slots s JOIN users u ON u.id = s.user_id
+      WHERE s.active = 1 AND s.weekday = ? AND s.time = ?`,
+    [wd, hh],
+  )) as (Row & { user_id: string; time: string })[];
 
   for (const r of rows) {
-    if (!slot(r.weekdays, wd) || r.time !== hh) continue;
     const uniq = `${r.user_id}:${day}:${hh}`;
-    await d.run(
-      `INSERT OR IGNORE INTO jobs (id, kind, user_id, payload, uniq, status, created_at, expires_at)
-       VALUES (?, 'run', ?, '{}', ?, 'pending', ?, ?)`,
-      [nid(), r.user_id, uniq, nowIso(), addDaysIso(50)],
-    );
+    const exists = await d.get("SELECT id FROM jobs WHERE uniq = ?", [uniq]);
+    if (exists) continue; // this day+user+clock is already materialized
+    try {
+      await d.run(
+        `INSERT INTO jobs (id, kind, user_id, payload, uniq, status, created_at, expires_at)
+         VALUES (?, 'run', ?, '{}', ?, 'pending', ?, ?)`,
+        [nid(), r.user_id, uniq, nowIso(), addDaysIso(50)],
+      );
+    } catch {
+      // concurrent fillDue won the race; the unique index keeps slots single.
+    }
   }
 }
 

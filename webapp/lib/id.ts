@@ -23,6 +23,10 @@ export function addSecondsIso(sec: number, from = new Date()): string {
   return new Date(from.getTime() + sec * 1_000).toISOString();
 }
 
+export function addMinutesIso(min: number, from = new Date()): string {
+  return new Date(from.getTime() + min * 60_000).toISOString();
+}
+
 // --- weekday helpers (ISO: Mon=1 … Sun=7) -----------------------------
 
 /** Bitmask where Mon=bit0 … Sun=bit6 → weekday `d` is bit (d-1). */

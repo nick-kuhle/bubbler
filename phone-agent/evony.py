@@ -1,17 +1,16 @@
 """Evony run + link orchestration for the on-device agent.
 
-Flow (per docs/04-evony-flow.md):
-
-  run:  claim -> guard shield>24h? -> launch evony -> world view? -> open bubble
-        -> 3-day truce (7500 gems) -> activate -> confirm -> verify countdown -> close
-        -> report
-  link: launch -> email login -> type email -> send code
-        -> wait for code event -> type code -> confirm or RESEND -> verify world view
-        -> report
+  run:  launch evony -> world view? -> open bubble -> activate shield -> verify countdown
+        -> report (success | failed | expired) -> force-close Evony
+  link: launch -> email login -> type email -> send code -> post awaiting_phone/awaiting_code
+        -> wait for code event -> type code -> post linked/failed/expired -> force-close
 
 The vision layer (see vision.py) does screen-truth guards against the calibration templates
 in calibration/. Until calibration images exist the agent runs in *no-verify* mode: it
 follows coordinates if provided, otherwise reports a calibration-not-ready error.
+
+After every run/link the app is force-closed with `killall -9` so the phone is free for the
+real user (docs: "force-close app after every run").
 """
 
 from __future__ import annotations
@@ -88,10 +87,8 @@ class EvonyController:
     def apply_3day_bubble(self) -> dict:
         """One bubble application pass on the world view. Returns a result dict.
 
-        result keys: status(ok/failed/needs_code), shield_hours_remaining,
-                     duration_ms, error
+        result keys: status(success/failed), shield_hours_remaining, screenshot, error
         """
-        start = time.monotonic()
         try:
             self.tap("world_view", "bubble_menu")
             time.sleep(1)
@@ -107,12 +104,14 @@ class EvonyController:
         # Verify
         shot = self.t.screenshot()
         if not self.on_screen("shield_active", shot):
-            return {"status": "failed", "error": "shield indicator not found after activate"}
+            return {"status": "failed", "error": "shield indicator not found after activate",
+                    "screenshot": shot}
         hours = self.shield_hours(shot)
         return {
-            "status": "ok" if hours is None or hours >= 1 else "failed",
+            "status": "success" if hours is None or hours >= 1 else "failed",
             "shield_hours_remaining": hours,
             "error": None,
+            "screenshot": shot,
         }
 
     def shield_hours(self, screenshot: bytes):
@@ -124,10 +123,14 @@ class EvonyController:
                 return None
         return None  # no vision -> can't confirm remaining; status-only
 
+    def force_close_evony(self, bundle_id: str) -> None:
+        """Harden the close path: emit a HID cancel, then killall -9 the Evony process."""
+        self.t.force_close(bundle_id)
+
     # -- link flow -----------------------------------------------------
     def link_login(self, email: str, get_code, report_expired):
         """Drive the interactive link. `get_code` blocks until the orchestrator delivers the
-        submitted 6-digit code (long-poll). Returns result dict."""
+        submitted 6-digit code (long-poll). Returns result dict (linked/failed/expired)."""
         try:
             self.launch_login_screen()
             self.t.type_text(email)
@@ -139,7 +142,7 @@ class EvonyController:
         while True:
             code = get_code()                       # delivered ≈1s after user submits
             if code is None:
-                return {"status": "failed", "error": "no code delivered"}
+                return {"status": "expired", "error": "code entry window expired"}
             self.t.type_text(code)
             try:
                 self.tap("code_dialog", "confirm")
@@ -164,23 +167,33 @@ class EvonyController:
         except CalibrationMissing:
             log.warning("resend tap not calibrated; relying on user retrigger")
 
-    def close_evony(self) -> None:
-        self.t.home()
+
+def _best_shot(evony: EvonyController):
+    try:
+        return evony.t.screenshot()
+    except Exception:
+        return None
 
 
 def run_one(evony: EvonyController, event: dict, bundle_id: str) -> dict:
     """Dispatch a single long-poll 'run' event -> result dict the agent reports.
 
+    Result status ∈ success | failed | expired (the runs POST contract). Evony is
+    force-closed (killall -9) no matter the outcome so the phone is free for the user.
     ('link' events are handled separately by agent.py because they interleave with
     subsequent 'code' events on the long-poll stream.)
     """
-    evony.open_evony(bundle_id)
+    result = {"status": "failed", "error": "run did not start"}
     try:
+        evony.open_evony(bundle_id)
         state = evony.to_world_view(event.get("email", ""))
         if state == "needs_code":
-            return {"status": "needs_code", "error": "session revoked or new device"}
-        if state == "failed":
-            return {"status": "failed", "error": "could not reach world view"}
-        return evony.apply_3day_bubble()
+            result = {"status": "expired", "error": "session revoked or new device"}
+        elif state == "failed":
+            result = {"status": "failed", "error": "could not reach world view"}
+        else:
+            result = evony.apply_3day_bubble()
     finally:
-        evony.close_evony()
+        result.setdefault("screenshot", _best_shot(evony))
+        evony.force_close_evony(bundle_id)
+    return result

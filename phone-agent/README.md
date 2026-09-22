@@ -43,5 +43,8 @@ LaunchDaemon). The LaunchDaemon plist is in `bootstrap/`.
 
 ## Config keys
 
-See `config.example.yaml`. The phone needs two things: the Vercel base URL and the agent
-bearer token. Everything else (Hermes port, retries, vision thresholds) has sane defaults.
+See `config.example.yaml`. The phone needs two things: the Vercel base URL
+(`cloud.base_url`) and the bearer token (`cloud.agent_token`). Runs are driven entirely by
+the cloud's per-slot scheduler (each `schedule.slots` row its own `weekday`/`time`, UTC),
+so the agent holds the long-poll and executes whatever job the cloud emits. Everything else
+(Hermes port, retries) has sane defaults.

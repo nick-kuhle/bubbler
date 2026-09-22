@@ -28,6 +28,8 @@
     <!-- The agent holds an HTTP long-poll; launchd's job-control timeout would kill it.
          KeepAlive + no throttle means instant restart on crash, and the stays-alive
          policy lets the loop hold its request without being reaped. -->
+    <key>RunAtLoad</key>
+    <true/>
     <key>KeepAlive</key>
     <true/>
     <key>ThrottleInterval</key>

@@ -1,11 +1,14 @@
-// app/page.tsx — landing / magic-link login. Email IS the login (and the Evony login).
+// app/[locale]/page.tsx — landing / magic-link login. Email IS the login (and the Evony login).
 // No passwords stored. First use of a private email is seed-gated (we decide who's in).
 
 "use client";
 
 import { FormEvent, useState } from "react";
 
+import { useLocale } from "@/lib/i18n";
+
 export default function Landing() {
+  const locale = useLocale();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +25,7 @@ export default function Landing() {
       });
       if (!r.ok) throw new Error(`login failed (${r.status})`);
       const data = (await r.json()) as { evony_name: string; is_operator: boolean };
-      window.location.href = data.is_operator ? "/master" : "/dashboard";
+      window.location.href = data.is_operator ? `/${locale}/master` : `/${locale}/dashboard`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "unknown error");
     } finally {

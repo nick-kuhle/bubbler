@@ -1,10 +1,15 @@
-import { cookies } from "next/headers";
-import { t, isLang, Lang, LANG_COOKIE } from "@/lib/i18n";
+import { setRequestLocale } from "next-intl/server";
 
-export default async function Info() {
-  const rawLang = (await cookies()).get(LANG_COOKIE)?.value;
-  const lang: Lang = isLang(rawLang) ? rawLang : "en";
-  const dict = t(lang);
+import { Lang, t } from "@/lib/i18n";
+
+export default async function Info({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const dict = t(locale as Lang);
 
   return (
     <section className="card">

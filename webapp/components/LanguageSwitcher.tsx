@@ -1,15 +1,21 @@
-// components/LanguageSwitcher.tsx — tiny client island: the iScout-native-name dropdown.
-// Rows show each language by its OWN native name (English · Español · …), read straight
-// from the dictionary's NATIVE/SUPPORTED maps, so adding a language = one dict block.
-// Writes the lang cookie and refreshes; the server layout re-reads it and re-renders.
+// components/LanguageSwitcher.tsx — client island. iScout-style select: one normalized
+// select, one option per locale showing only the native-language name (English · Español).
+// Changing locale via next-intl's router.push(pathname, {locale}) — URL gets a canonical
+// /<locale>/… prefix, no cookie needs to be written here.
 
 "use client";
 
-import { useRouter } from "next/navigation";
-import { SUPPORTED, NATIVE, LANG_COOKIE } from "@/lib/i18n";
+import { useLocale, useTranslations } from "@/lib/i18n";
+import { NATIVE } from "@/lib/i18n";
+import { usePathname, useRouter } from "@/src/i18n/navigation";
+import { routing } from "@/src/i18n/routing";
 
-export default function LanguageSwitcher({ current }: { current: string }) {
+export default function LanguageSwitcher() {
+  const t = useTranslations();
+  const locale = useLocale();
+  const pathname = usePathname();
   const router = useRouter();
+
   return (
     <label
       className="switcher"
@@ -22,12 +28,12 @@ export default function LanguageSwitcher({ current }: { current: string }) {
         fontSize: "0.85rem",
       }}
     >
-      <span style={{ opacity: 0.9 }}>language</span>
+      <span style={{ opacity: 0.9 }}>{t("common.language")}</span>
       <select
-        value={current}
+        value={locale}
         onChange={(e) => {
-          document.cookie = `${LANG_COOKIE}=${e.target.value}; path=/; max-age=31536000; samesite=lax`;
-          router.refresh();
+          const next = e.target.value;
+          router.push(pathname, { locale: next });
         }}
         style={{
           appearance: "none",
@@ -44,7 +50,7 @@ export default function LanguageSwitcher({ current }: { current: string }) {
           outline: "none",
         }}
       >
-        {SUPPORTED.map((l) => (
+        {routing.locales.map((l) => (
           <option key={l} value={l}>
             {NATIVE[l]}
           </option>

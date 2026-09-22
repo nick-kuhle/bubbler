@@ -29,7 +29,8 @@ API + DB).
 
 ```
 users       id, email (plaintext; app login + Evony login), evony_name, is_operator
-schedules   id, user_id, weekdays, time, gem_ack, active
+slots       id, user_id, weekday (1=Mon…7=Sun), time (HH:MM UTC), shield_hours,
+            gem_ack, active — one row per day+time (Mon 09:00 / Wed 09:00 / Fri 18:00)
 runs        id, user_id, triggered_at, trigger_type, status, evidence_ref,
             shield_hours_remaining, duration_ms, error
 re_link     id, user_id, requested_at, code_status, active

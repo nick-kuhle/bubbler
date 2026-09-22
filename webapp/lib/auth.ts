@@ -76,6 +76,19 @@ export async function currentUser(): Promise<CurrentUser | null> {
   return row ? rowToUser(row) : null;
 }
 
+/** Create a raw bearer session token stored in `sessions` (also used by the phone agent). */
+export async function createSession(
+  userId: string,
+  days: number,
+): Promise<string> {
+  const token = newToken();
+  await db().run(
+    "INSERT INTO sessions (id, token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+    [nid(), sha256(token), userId, addDaysIso(days), nowIso()],
+  );
+  return token;
+}
+
 /** Create a user if needed (private circle, email seed-gated) and start a session. */
 export async function ensureUser(email: string, isOperator = false): Promise<CurrentUser> {
   const e = String(email || "").trim().toLowerCase();
@@ -86,7 +99,7 @@ export async function ensureUser(email: string, isOperator = false): Promise<Cur
   let created = false;
   if (!row) {
     const id = nid();
-    d.run(
+    await d.run(
       "INSERT INTO users (id, email, evony_name, is_operator, created_at) VALUES (?, ?, ?, ?, ?)",
       [id, e, e, isOperator ? 1 : 0, nowIso()],
     );
@@ -96,7 +109,7 @@ export async function ensureUser(email: string, isOperator = false): Promise<Cur
   const user = rowToUser(row!);
   // link the session
   const token = newToken();
-  d.run(
+  await d.run(
     "INSERT INTO sessions (id, token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
     [nid(), sha256(token), user.id, addDaysIso(30), nowIso()],
   );

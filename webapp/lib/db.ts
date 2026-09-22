@@ -115,35 +115,54 @@ const MIGRATIONS: string[] = [
      created_at TEXT NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`,
-  `CREATE TABLE IF NOT EXISTS schedules (
+  // Fresh deploy: the old one-row-per-user `schedules` (weekdays bitmask + single time)
+  // is dropped — a user's schedule is now the set of their active `slots` rows, each
+  // with its own weekday AND time (Mon 09:00 / Wed 09:00 / Fri 18:00 are distinct rows).
+  `DROP TABLE IF EXISTS schedules`,
+  `CREATE TABLE IF NOT EXISTS slots (
      id TEXT PRIMARY KEY,
      user_id TEXT NOT NULL REFERENCES users(id),
-     weekdays INTEGER NOT NULL,
-     time TEXT NOT NULL,
-     gem_ack INTEGER NOT NULL DEFAULT 0,
+     weekday INTEGER NOT NULL,          -- ISO weekday 1=Mon … 7=Sun
+     time TEXT NOT NULL,                -- "HH:MM" in UTC
+     shield_hours INTEGER NOT NULL DEFAULT 72, -- 72 = 3-day truce (2,500 gems); 24 = 1,000
+     gem_ack INTEGER NOT NULL DEFAULT 1,   -- user acknowledged gem cost
      active INTEGER NOT NULL DEFAULT 1,
      created_at TEXT NOT NULL
    )`,
-  `CREATE INDEX IF NOT EXISTS idx_schedules_user ON schedules(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_slots_user ON slots(user_id)`,
   `CREATE TABLE IF NOT EXISTS link_sessions (
      id TEXT PRIMARY KEY,
      user_id TEXT NOT NULL REFERENCES users(id),
      state TEXT NOT NULL,
+     error TEXT,
      created_at TEXT NOT NULL,
      expires_at TEXT NOT NULL
    )`,
   `CREATE TABLE IF NOT EXISTS jobs (
      id TEXT PRIMARY KEY,
-     kind TEXT NOT NULL REFERENCES jobs(id) COLLATE NOCASE,
+     kind TEXT NOT NULL,
      user_id TEXT NOT NULL REFERENCES users(id),
      payload TEXT NOT NULL,
      status TEXT NOT NULL DEFAULT 'pending',
      uniq TEXT,
      created_at TEXT NOT NULL,
-     expires_at TEXT,
-     UNIQUE(uniq) WHERE uniq IS NOT NULL
+     expires_at TEXT
    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_uniq ON jobs(uniq)`,
   `CREATE INDEX IF NOT EXISTS idx_jobs_pending ON jobs(status, created_at)`,
+  `CREATE TABLE IF NOT EXISTS runs (
+     id TEXT PRIMARY KEY,
+     job_id TEXT,
+     user_id TEXT NOT NULL REFERENCES users(id),
+     trigger TEXT NOT NULL DEFAULT 'schedule',
+     status TEXT NOT NULL,
+     shield_hours_remaining REAL,
+     evidence_ref TEXT,
+     error TEXT,
+     duration_ms INTEGER,
+     created_at TEXT NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_runs_user ON runs(user_id, created_at)`,
 ];
 
 export async function migrate(): Promise<void> {

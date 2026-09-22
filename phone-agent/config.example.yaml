@@ -1,31 +1,23 @@
 # On-device agent config — COPY to config.yaml and fill in real values.
 # NEVER commit config.yaml. This file is the template only.
 
-agent:
-  # Vercel-deployed web app
-  cloud_base_url: "https://YOUR-APP.vercel.app"
-  bearer_token: "REPLACE_WITH_AGENT_TOKEN"   # from secrets store, not git
+cloud:
+  base_url: https://bubbler.vercel.app
+  agent_token: ""          # long-lived bearer, minted by the master
 
-  # Long-poll hold: how long the server may hold our open request.
-  # Keep ~5s under the Vercel function duration cap (Hobby = 60s).
-  events_hold_seconds: 45
-  # When Vercel returns a held empty response, reconnect immediately.
-  reconnect_delay_seconds: 2
+phone:
+  evony_bundle_id: com.topgamesinc.evony   # UPDATE once installed; capture via ideviceinstaller
 
-  # Run flow settings
-  verify_retries: 2
-  shield_min_remaining_hours: 24   # idempotency guard
+schedule:
+  slots:                   # per-slot model — each day its own time, UTC
+    - weekday: 1          # Mon
+      time: "09:00"
+    - weekday: 3          # Wed
+      time: "09:00"
+    - weekday: 5          # Fri
+      time: "18:00"
+  shield_hours: 72        # 3-day = 2,500 gems; 24h = 1,000
 
-device:
-  # Automation surface (the app is driven on-device now, not over USB)
-  hermes_touch_url: "http://127.0.0.1:8887"
-  # Bundle id of Evony (set from the installed app)
-  evony_bundle_id: "com.xxx.evony"
-
-vision:
-  calibration_dir: "calibration"   # reference screenshots + ROI maps
-  tesseract_cmd: "/usr/local/bin/tesseract"   # on-device path (Procursus: /var/jb/usr/bin/tesseract)
-  enabled: true                    # set false until calibration images exist (no-verify mode)
-
-logging:
-  level: "INFO"
+runner:
+  timeout_run_ms: 120000
+  poll_interval_ms: 3000
