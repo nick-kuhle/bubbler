@@ -1,13 +1,25 @@
 import type { Metadata } from "next";
+import { Cinzel, Nunito } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 
-import LanguageSwitcher from "@/components/LanguageSwitcher";
-import UtcClock from "@/components/UtcClock";
-import { Link, Lang, t, UTC_NOTE } from "@/lib/i18n";
+import SiteChrome from "@/components/SiteChrome";
+import { Lang, t } from "@/lib/i18n";
 import { routing } from "@/src/i18n/routing";
 
 import "../globals.css";
+
+const cinzel = Cinzel({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800", "900"],
+  variable: "--font-display",
+});
+
+const nunito = Nunito({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-sans",
+});
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -27,11 +39,11 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  // iScout-style: a canonical URL per language + hreflang alternates for every locale.
   return {
-    title: "LOL automatic bubble scheduler",
+    title: "LOL Bubbler — Alliance Truce Scheduler",
     description:
       "Alliance LOL — we don't take things seriously. Automatic overlapping 3-day Evony bubbles, so nobody's city burns while we're asleep.",
+    icons: { icon: "/images/logo.png" },
     alternates: {
       canonical: `${baseUrl}/${locale}`,
       languages: {
@@ -52,13 +64,12 @@ export default async function LocaleLayout({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const lang = locale as Lang;
   const messages = await getMessages();
-  const dict = t(lang);
+  const dict = t(locale as Lang);
 
   return (
-    <html lang={locale}>
-      <body>
+    <html lang={locale} className={`${cinzel.variable} ${nunito.variable}`}>
+      <body className={nunito.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <div className="bubbles" aria-hidden>
             <span /><span /><span /><span /><span />
@@ -66,24 +77,8 @@ export default async function LocaleLayout({
             <span /><span /><span /><span /><span />
             <span /><span /><span />
           </div>
-          <header className="shell">
-            <Link href="/" className="brand">
-              <span className="lol">LOL</span>
-              bubbler
-            </Link>
-            <nav>
-              <Link href="/dashboard">{dict.nav.dashboard}</Link>
-              <Link href="/master">{dict.nav.master}</Link>
-              <Link href="/wizard">{dict.nav.wizard}</Link>
-              <Link href="/info">{dict.nav.info}</Link>
-            </nav>
-            <div className="shell-end">
-              <UtcClock />
-              <span className="utc-note">{UTC_NOTE}</span>
-              <LanguageSwitcher />
-            </div>
-          </header>
-          <main>{children}</main>
+          <div className="grain" />
+          <SiteChrome dict={dict}>{children}</SiteChrome>
         </NextIntlClientProvider>
       </body>
     </html>

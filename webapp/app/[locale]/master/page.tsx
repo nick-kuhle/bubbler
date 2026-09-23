@@ -1,6 +1,3 @@
-// app/[locale]/master/page.tsx — operator read-only view. Calls the one route that exists for it:
-// GET /api/master → { operator, slots, runs }. Per-slot model: one row per (day, time).
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -18,6 +15,14 @@ type MasterData = {
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const dayName = (weekday: number): string => DAYS[weekday - 1] ?? String(weekday);
 
+function tone(status: string): string {
+  const s = status.toLowerCase();
+  if (s.includes("ok") || s.includes("success") || s.includes("done")) return "ok";
+  if (s.includes("fail") || s.includes("error")) return "bad";
+  if (s.includes("queue") || s.includes("pend") || s.includes("wait")) return "warn";
+  return "";
+}
+
 export default function Master() {
   const [data, setData] = useState<MasterData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,48 +37,75 @@ export default function Master() {
       .catch((e) => setError(e instanceof Error ? e.message : "unknown error"));
   }, []);
 
-  if (error) return <section className="card warn"><p>{error}</p><Link href="/">back to login</Link></section>;
-  if (!data) return <section className="card"><p className="muted">loading operator data…</p></section>;
+  if (error) {
+    return (
+      <section className="card warn">
+        <p>{error}</p>
+        <Link href="/">back to login</Link>
+      </section>
+    );
+  }
+  if (!data) {
+    return <section className="card"><p className="muted">loading operator data…</p></section>;
+  }
 
   return (
-    <section className="card">
-      <h2>LOL · master runs</h2>
-      <p className="muted">
-        operator <strong>{data.operator}</strong> — every claimed job for alliance LOL, newest first.
-      </p>
+    <>
+      <section className="hero-banner">
+        <img src="/images/banner.jpg" alt="" className="cover" />
+        <div className="veil" />
+        <div className="copy hsplit">
+          <div>
+            <p className="kicker">Operator</p>
+            <h1 className="title-gold font-display" style={{ margin: "0.15rem 0 0", fontSize: "clamp(1.8rem, 5vw, 2.8rem)" }}>
+              War Room
+            </h1>
+            <p className="muted" style={{ maxWidth: 560 }}>
+              operator <strong>{data.operator}</strong> — every claimed job for alliance LOL, newest first.
+            </p>
+          </div>
+          <span className="badge">{data.operator}</span>
+        </div>
+      </section>
 
-      <h3 style={{ marginTop: "1.2rem" }}>slots</h3>
-      <table>
-        <thead><tr><th>player</th><th>day</th><th>time</th><th>active</th></tr></thead>
-        <tbody>
-          {data.slots.map((s) => (
-            <tr key={s.id}>
-              <td>{s.evony_name}</td>
-              <td>{dayName(s.weekday)}</td>
-              <td>{s.time}</td>
-              <td>{s.active ? "yes" : "no"}</td>
-            </tr>
-          ))}
-          {data.slots.length === 0 && <tr><td colSpan={4} className="muted">no slots yet</td></tr>}
-        </tbody>
-      </table>
+      <div style={{ display: "grid", gap: "1rem" }}>
+        <section className="card">
+          <h3>slots</h3>
+          <table>
+            <thead><tr><th>player</th><th>day</th><th>time</th><th>active</th></tr></thead>
+            <tbody>
+              {data.slots.map((s) => (
+                <tr key={s.id}>
+                  <td>{s.evony_name}</td>
+                  <td>{dayName(s.weekday)}</td>
+                  <td>{s.time}</td>
+                  <td><span className={`badge ${s.active ? "ok" : ""}`}>{s.active ? "yes" : "no"}</span></td>
+                </tr>
+              ))}
+              {data.slots.length === 0 && <tr><td colSpan={4} className="muted">no slots yet</td></tr>}
+            </tbody>
+          </table>
+        </section>
 
-      <h3 style={{ marginTop: "1.6rem" }}>runs</h3>
-      <table>
-        <thead><tr><th>player</th><th>kind</th><th>status</th><th>shield hrs left</th><th>created</th></tr></thead>
-        <tbody>
-          {data.runs.map((r, i) => (
-            <tr key={i}>
-              <td>{r.evony_name}</td>
-              <td>{r.kind}</td>
-              <td>{r.status}</td>
-              <td>{r.shield_hours_remaining ?? "—"}</td>
-              <td className="muted">{String(r.created_at).slice(0, 16)}</td>
-            </tr>
-          ))}
-          {data.runs.length === 0 && <tr><td colSpan={5} className="muted">no runs yet — they appear as the scheduler works</td></tr>}
-        </tbody>
-      </table>
-    </section>
+        <section className="card">
+          <h3>runs</h3>
+          <table>
+            <thead><tr><th>player</th><th>kind</th><th>status</th><th>shield hrs left</th><th>created</th></tr></thead>
+            <tbody>
+              {data.runs.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.evony_name}</td>
+                  <td>{r.kind}</td>
+                  <td><span className={`badge ${tone(r.status)}`}>{r.status}</span></td>
+                  <td>{r.shield_hours_remaining ?? "—"}</td>
+                  <td className="muted">{String(r.created_at).slice(0, 16)}</td>
+                </tr>
+              ))}
+              {data.runs.length === 0 && <tr><td colSpan={5} className="muted">no runs yet — they appear as the scheduler works</td></tr>}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </>
   );
 }

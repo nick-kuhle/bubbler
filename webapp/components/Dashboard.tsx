@@ -62,6 +62,42 @@ function statusClass(status: string): string {
   return "";
 }
 
+function ShieldRing({ hours, max = 72 }: { hours: number; max?: number }) {
+  const pct = Math.max(0, Math.min(1, hours / max));
+  const r = 42;
+  const c = 2 * Math.PI * r;
+  const dash = c * pct;
+  return (
+    <svg viewBox="0 0 100 100" className="shield-glow" style={{ width: "7rem", height: "7rem" }}>
+      <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(232,197,107,0.18)" strokeWidth="8" />
+      <circle
+        cx="50"
+        cy="50"
+        r={r}
+        fill="none"
+        stroke="url(#sg)"
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeDasharray={`${dash} ${c}`}
+        transform="rotate(-90 50 50)"
+      />
+      <defs>
+        <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7ad7ff" />
+          <stop offset="55%" stopColor="#ff4d8d" />
+          <stop offset="100%" stopColor="#f8e7a0" />
+        </linearGradient>
+      </defs>
+      <text x="50" y="48" textAnchor="middle" fill="#f8e7a0" fontSize="16" fontWeight="800" fontFamily="Cinzel, serif">
+        {hours.toFixed(0)}h
+      </text>
+      <text x="50" y="64" textAnchor="middle" fill="#7ad7ff" fontSize="8" fontWeight="700" letterSpacing="1.5">
+        SHIELD
+      </text>
+    </svg>
+  );
+}
+
 export default function Dashboard({ dict }: { dict: Dict }) {
   const d = dict.dashboard;
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
@@ -235,21 +271,58 @@ export default function Dashboard({ dict }: { dict: Dict }) {
   }
 
   const roleBadge = me.user.is_operator ? d.roleOperator : d.roleMember;
+  const remaining = me.last_run?.shield_hours_remaining ?? 0;
 
   return (
     <section className="stack" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <section className="card">
-        <div className="hsplit">
-          <div>
-            <h2 style={{ marginBottom: "0.2rem" }}>{d.title}</h2>
-            <p className="muted" style={{ margin: 0 }}>{d.intro}</p>
+      <section className="keep-hero">
+        <img src="/images/keep.jpg" alt="" className="cover" />
+        <div className="veil" />
+        <div className="copy hsplit">
+          <div style={{ display: "flex", alignItems: "flex-end", gap: "0.8rem" }}>
+            <img src="/images/general.jpg" alt="" className="avatar" />
+            <div>
+              <p className="kicker">{roleBadge} · {me.user.evony_name}</p>
+              <h1 className="title-gold font-display" style={{ margin: "0.15rem 0 0", fontSize: "clamp(1.7rem, 4vw, 2.6rem)" }}>
+                {d.title}
+              </h1>
+              <p className="muted" style={{ margin: "0.25rem 0 0", maxWidth: 460 }}>{d.intro}</p>
+              <div className="row" style={{ marginTop: "0.55rem" }}>
+                <span className={`badge ${remaining > 1 ? "ok" : "warn"}`}>
+                  {remaining > 1 ? `${remaining.toFixed(0)}h shield` : d.neverRun}
+                </span>
+                <span className="badge">{d.gems72}</span>
+                <span className="badge ok">{d.shield72}</span>
+              </div>
+            </div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <span className="badge">{roleBadge}</span>
-            {me.user.evony_name && <p className="muted" style={{ margin: "0.25rem 0 0" }}>{me.user.evony_name}</p>}
-          </div>
+          <ShieldRing hours={remaining} />
         </div>
       </section>
+
+      <div className="stat-grid">
+        <div className="card stat">
+          <img src="/images/gem.png" alt="" className="thumb" />
+          <div>
+            <p className="lbl">{d.gemsCol}</p>
+            <p className="val">2,500</p>
+          </div>
+        </div>
+        <div className="card stat">
+          <img src="/images/truce.jpg" alt="" className="thumb" />
+          <div>
+            <p className="lbl">{d.lastRun}</p>
+            <p className="val">{remaining > 0 ? `${remaining.toFixed(1)}h` : "—"}</p>
+          </div>
+        </div>
+        <div className="card stat">
+          <img src="/images/logo.png" alt="" className="thumb" />
+          <div>
+            <p className="lbl">{d.runTitle}</p>
+            <p className="val">{next ? countdown(nextTs - nowTs) : d.never}</p>
+          </div>
+        </div>
+      </div>
 
       <section className="card">
         <h3>{d.profileTitle}</h3>

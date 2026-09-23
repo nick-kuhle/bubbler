@@ -53,5 +53,16 @@ export default async function WizardPage({
     }
   }
 
-  return <WizardForm dict={dict} />;
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
+        <img src="/images/truce.jpg" alt="" className="thumb" style={{ width: "4.5rem", height: "4.5rem", borderRadius: "1rem" }} />
+        <div>
+          <p className="kicker">Truce Agreement</p>
+          <h2 className="title-gold font-display" style={{ margin: "0.15rem 0 0" }}>{w.title}</h2>
+        </div>
+      </div>
+      <WizardForm dict={dict} />
+    </>
+  );
 }

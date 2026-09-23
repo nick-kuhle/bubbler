@@ -287,7 +287,8 @@ export default function WizardForm({ dict }: Props) {
               value={code}
               placeholder={w.codePlaceholder}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              style={{ width: "100%", fontVariantNumeric: "tabular-nums", letterSpacing: "0.3em" }}
+              className="otp"
+              style={{ width: "100%" }}
             />
           </label>
           {message && <p className="warn" role="alert">{message.text}</p>}
