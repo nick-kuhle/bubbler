@@ -239,7 +239,7 @@ class CodeRelay:
 
     def get_code(self):
         try:
-            return self._codes.get(timeout=600)
+            return self._codes.get(timeout=90)
         except queue.Empty:
             return None
 
