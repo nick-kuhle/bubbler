@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, type Dict } from "@/lib/i18n";
-import { GEMS_24H, GEMS_72H } from "@/lib/i18n";
+import { GEMS_72H } from "@/lib/i18n";
 import SlotsEditor, {
   EditSlot,
   MAX_SLOTS,
@@ -111,8 +111,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
     return () => clearInterval(id);
   }, [nextTs]);
 
-  // Gem cost preview for the ack line: 72h slots cost 2,500, 24h slots cost 1,000.
-  const ackGems = slots.some((s) => s.shield_hours === 72) ? GEMS_72H : GEMS_24H;
+  const ackGems = GEMS_72H;
 
   /** Replace-all save: the editor's rows ARE the user's schedule now. */
   async function save(): Promise<boolean> {
@@ -293,7 +292,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         <SlotsEditor slots={slots} onChange={setSlots} dict={dict} />
 
         <p className="muted" style={{ margin: "0.9rem 0 0.6rem" }}>
-          {d.gemCost}: {ackGems === GEMS_72H ? d.gems72 : d.gems24}
+          {d.gemCost}: {d.gems72}
         </p>
 
         <label className="ack">

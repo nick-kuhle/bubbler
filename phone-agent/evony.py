@@ -183,6 +183,8 @@ class EvonyController:
             time.sleep(1.8)
             log.info("entering email (len=%d)", len(email))
             self._enter_email(email)
+            if not self._wait_for_code_dialog(12.0):
+                log.warning("verify-email dialog not detected after email confirm")
             if on_waiting_code:
                 on_waiting_code()
         except CalibrationMissing as extra:
@@ -194,26 +196,20 @@ class EvonyController:
             if code is None:
                 return {"status": "expired", "error": "code entry window expired"}
             try:
-                self.tap_pair("code_dialog", "code")
-                time.sleep(0.4)
-            except CalibrationMissing:
-                pass
-            self.t.type_text(code)
-            try:
-                self.tap_pair("code_dialog", "confirm")
+                self._enter_code(code)
             except CalibrationMissing as extra:
                 return {"status": "failed", "error": f"calibration: {extra}"}
-            time.sleep(4)
+            time.sleep(6)
             if self.on_screen("world_view"):
                 return {"status": "linked"}
-            if self.v is None:
-                # no-verify mode: code was typed; operator confirms on the phone
-                return {"status": "linked"}
-            attempts += 1
-            if attempts >= 3:
-                return {"status": "failed", "error": "could not confirm code after retries"}
-            report_expired()                        # tell the wizard: ask the user again
-            self.tap_resend()
+            if self._code_dialog_visible():
+                attempts += 1
+                if attempts >= 3:
+                    return {"status": "failed", "error": "code was not accepted"}
+                report_expired()
+                self.tap_resend()
+                continue
+            return {"status": "linked"}
 
     def _login_icon_point(self) -> tuple[int, int]:
         spec = (self.cal.screens.get("email_login") or {}) if self.cal else {}
@@ -320,6 +316,50 @@ class EvonyController:
         log.info("tap confirm once")
         self.t.tap(579, 1100)
         time.sleep(2.8)
+
+    def _code_spec(self) -> dict:
+        return (self.cal.screens.get("code_dialog") or {}) if self.cal else {}
+
+    def _code_tap(self, name: str, default: tuple[int, int]) -> tuple[int, int]:
+        raw = (self._code_spec().get("taps") or {}).get(name) or {}
+        return int(raw.get("x", default[0])), int(raw.get("y", default[1]))
+
+    def _enter_code(self, code: str) -> None:
+        digits = "".join(ch for ch in str(code or "") if ch.isdigit())
+        if len(digits) != 6:
+            raise CalibrationMissing(f"code must be 6 digits, got {code!r}")
+        box_x, box_y = self._code_tap("code", (130, 813))
+        log.info("tap first code box %s,%s", box_x, box_y)
+        self.t.tap(box_x, box_y)
+        time.sleep(0.5)
+        self.t.tap(box_x, box_y)
+        time.sleep(1.2)
+        keypad = self._code_spec().get("keypad") or {}
+        defaults = {
+            "1": (142, 1244), "2": (414, 1244), "3": (686, 1244),
+            "4": (142, 1362), "5": (414, 1362), "6": (686, 1362),
+            "7": (142, 1474), "8": (414, 1474), "9": (686, 1474),
+            "0": (414, 1586),
+        }
+        for i, digit in enumerate(digits, 1):
+            raw = keypad.get(digit) or {}
+            x, y = int(raw.get("x", defaults[digit][0])), int(raw.get("y", defaults[digit][1]))
+            log.info("code digit %s/%s tap %s,%s", i, digit, x, y)
+            self.t.tap(x, y)
+            time.sleep(0.35)
+        time.sleep(0.5)
+        done_x, done_y = self._code_tap("done", (605, 1146))
+        log.info("tap keyboard Done %s,%s", done_x, done_y)
+        self.t.tap(done_x, done_y)
+        time.sleep(0.6)
+        try:
+            self.t.hide_keyboard()
+        except Exception:
+            pass
+        time.sleep(1.2)
+        confirm_x, confirm_y = self._code_tap("confirm", (580, 1082))
+        log.info("tap code confirm %s,%s", confirm_x, confirm_y)
+        self.t.tap(confirm_x, confirm_y)
 
     def _dialog_visible(self) -> bool:
         img = self._grab()

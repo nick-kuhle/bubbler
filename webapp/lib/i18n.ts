@@ -103,7 +103,6 @@ type DeepStringify<T> = T extends string ? string : { [K in keyof T]: DeepString
 export type Dict = DeepStringify<typeof en>;
 
 // Game economy: a fresh Truce Agreement costs gems (matches Evony's store).
-export const GEMS_24H = 1000;
 export const GEMS_72H = 2500;
 
 // Every time/delay shown anywhere in the app is real Evony server time = UTC.

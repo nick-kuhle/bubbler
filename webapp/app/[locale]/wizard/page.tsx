@@ -33,11 +33,11 @@ export default async function WizardPage({
   }
 
   if (!again) {
-    const link = await db().get(
-      `SELECT state FROM link_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
+    const scheduled = await db().get(
+      `SELECT id FROM slots WHERE user_id = ? AND active = 1 LIMIT 1`,
       [user.id],
     );
-    if (link && link.state === "linked") {
+    if (scheduled) {
       return (
         <section className="card" style={{ maxWidth: 560, margin: "3rem auto", textAlign: "center" }}>
           <p className="ok" style={{ fontSize: "1.6rem", margin: "0 0 0.4rem" }}>✓</p>

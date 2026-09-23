@@ -132,7 +132,7 @@ const MIGRATIONS: string[] = [
      user_id TEXT NOT NULL REFERENCES users(id),
      weekday INTEGER NOT NULL,          -- ISO weekday 1=Mon … 7=Sun
      time TEXT NOT NULL,                -- "HH:MM" in UTC
-     shield_hours INTEGER NOT NULL DEFAULT 72, -- 72 = 3-day truce (2,500 gems); 24 = 1,000
+      shield_hours INTEGER NOT NULL DEFAULT 72, -- 72 = 3-day truce (2,500 gems)
      gem_ack INTEGER NOT NULL DEFAULT 1,   -- user acknowledged gem cost
      active INTEGER NOT NULL DEFAULT 1,
      created_at TEXT NOT NULL

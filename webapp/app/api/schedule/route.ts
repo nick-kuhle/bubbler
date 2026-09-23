@@ -42,12 +42,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "bad-slots-count" }, { status: 400 });
   }
 
-  const defaultShield = body.shield_hours === undefined ? 72 : Number(body.shield_hours);
-  if (defaultShield !== 24 && defaultShield !== 72) {
-    return NextResponse.json({ error: "bad-shield" }, { status: 400 });
-  }
-  // gem acknowledgement defaults to yes: reaching this route means the user pressed
-  // save/confirm next to the gem-cost copy.
   const defaultAck = body.gem_ack === undefined ? 1 : body.gem_ack ? 1 : 0;
   const defaultActive = body.active === false ? 0 : 1;
 
@@ -60,10 +54,7 @@ export async function POST(req: NextRequest) {
     }
     const time = String(s.time ?? "");
     if (!TIME_RE.test(time)) return NextResponse.json({ error: "bad-time" }, { status: 400 });
-    const shield = s.shield_hours === undefined ? defaultShield : Number(s.shield_hours);
-    if (shield !== 24 && shield !== 72) {
-      return NextResponse.json({ error: "bad-shield" }, { status: 400 });
-    }
+    const shield = 72;
     valid.push({
       weekday,
       time,

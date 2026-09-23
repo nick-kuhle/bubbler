@@ -5,14 +5,13 @@
 // Pure editing surface: owns no persistence — parents POST /api/schedule themselves.
 
 import type { Dict } from "@/lib/i18n";
-import { GEMS_24H, GEMS_72H } from "@/lib/i18n";
 
 export type EditSlot = {
   key: number; // stable client-only row key (React + radio names)
   id?: string; // server slot id when loaded from /api/me
   weekday: number; // ISO 1=Mon … 7=Sun
   time: string; // "HH:MM" in UTC
-  shield_hours: 24 | 72;
+  shield_hours: 72;
   active: boolean;
 };
 
@@ -53,7 +52,7 @@ export function slotFromMe(s: {
     id: s.id,
     weekday: s.weekday,
     time: s.time,
-    shield_hours: s.shield_hours === 24 ? 24 : 72,
+    shield_hours: 72,
     active: true,
   });
 }
@@ -157,17 +156,8 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
                   onChange={(e) => patch(s.key, { time: e.target.value })}
                 />
               </td>
-              <td>
-                <select
-                  value={s.shield_hours}
-                  aria-label={d.shieldLabel}
-                  onChange={(e) => patch(s.key, { shield_hours: e.target.value === "24" ? 24 : 72 })}
-                >
-                  <option value={72}>{d.shield72}</option>
-                  <option value={24}>{d.shield24}</option>
-                </select>
-              </td>
-              <td>{s.shield_hours === 72 ? d.gems72 : d.gems24}</td>
+              <td>{d.shield72}</td>
+              <td>{d.gems72}</td>
               <td className="muted">{untilLabel(s, dict)}</td>
               <td>
                 <input
