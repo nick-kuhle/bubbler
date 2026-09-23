@@ -178,12 +178,19 @@ class CloudClient:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
-        self.session = requests.Session()
-        self.session.headers.update({"Authorization": f"Bearer {self.token}"})
+        self._local = threading.local()
+
+    def _http(self) -> requests.Session:
+        session = getattr(self._local, "session", None)
+        if session is None:
+            session = requests.Session()
+            session.headers.update({"Authorization": f"Bearer {self.token}"})
+            self._local.session = session
+        return session
 
     def next_event(self, hold: int) -> dict | None:
         """One long-poll round. Returns the event dict or None (held empty)."""
-        r = self.session.get(
+        r = self._http().get(
             f"{self.base_url}/api/agent/events",
             params={"hold": hold},
             timeout=self.timeout + 5,
@@ -192,14 +199,14 @@ class CloudClient:
         return r.json().get("event")
 
     def report_run(self, payload: dict) -> str | None:
-        r = self.session.post(f"{self.base_url}/api/agent/runs", json=payload, timeout=30)
+        r = self._http().post(f"{self.base_url}/api/agent/runs", json=payload, timeout=30)
         r.raise_for_status()
         return r.json().get("run_id")
 
     def upload_evidence(self, run_id: str, png: bytes) -> str | None:
         """Raw PNG/JPEG bytes; the route detects the image type from its magic bytes."""
         content_type = "image/jpeg" if png[:3] == b"\xff\xd8\xff" else "image/png"
-        r = self.session.post(
+        r = self._http().post(
             f"{self.base_url}/api/agent/runs/{run_id}/evidence",
             data=png,
             headers={"Content-Type": content_type},
@@ -209,7 +216,8 @@ class CloudClient:
         return r.json().get("url")
 
     def report_link(self, link_id: str, payload: dict) -> None:
-        r = self.session.post(
+        log.info("link %s: %s", link_id, payload.get("status"))
+        r = self._http().post(
             f"{self.base_url}/api/agent/links/{link_id}/status",
             json=payload,
             timeout=30,
@@ -234,7 +242,7 @@ class CodeRelay:
 
     def deliver_code(self, event: dict) -> None:
         payload = event.get("payload") or {}
-        if self.active_link_id and payload.get("link_id") == self.active_link_id:
+        if self.active_link_id:
             self._codes.put(str(payload.get("code")))
 
     def get_code(self):
@@ -305,6 +313,13 @@ def _clamp_shield(hours):
 _link_lock = threading.Lock()
 
 
+def _safe_report(cloud: CloudClient, link_id: str, payload: dict) -> None:
+    try:
+        cloud.report_link(link_id, payload)
+    except Exception as exc:
+        log.warning("link %s report failed: %s", link_id, exc)
+
+
 def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyController,
              bundle_id: str) -> None:
     """Execute the interactive link flow, feeding codes from the long-poll stream."""
@@ -323,7 +338,7 @@ def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyCont
             event.get("email", ""),
             get_code=relay.get_code,
             report_expired=relay.report_expired,
-            on_waiting_code=lambda: cloud.report_link(link_id, {"status": "awaiting_code"}),
+            on_waiting_code=lambda: _safe_report(cloud, link_id, {"status": "awaiting_code"}),
             bundle_id=bundle_id,
         )
     finally:

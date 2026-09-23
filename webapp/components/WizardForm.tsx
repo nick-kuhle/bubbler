@@ -180,12 +180,10 @@ export default function WizardForm({ dict }: Props) {
   const step =
     linkId === null
       ? 1
-      : state === "awaiting_phone"
-        ? 2
-        : state === "awaiting_code"
-          ? submitting
-            ? 4
-            : 3
+      : state === "awaiting_phone" || state === "awaiting_code"
+        ? submitting
+          ? 4
+          : 3
           : state === "linked"
             ? scheduleSaved
               ? 6
@@ -276,10 +274,17 @@ export default function WizardForm({ dict }: Props) {
       {step === 3 && (
         <form onSubmit={(e) => void submitCode(e)}>
           <h3>{w.step3Title}</h3>
-          <p className="wizard-status ok">
-            <span>✓</span>
-            {w.step2Connected}
-          </p>
+          {state === "awaiting_phone" ? (
+            <p className="wizard-status">
+              <span className="spin" aria-hidden />
+              {w.step2Waiting}
+            </p>
+          ) : (
+            <p className="wizard-status ok">
+              <span>✓</span>
+              {w.step2Connected}
+            </p>
+          )}
           <p className="muted">{w.step3Body}</p>
           <label className="field">
             <span>{w.step3Title}</span>
