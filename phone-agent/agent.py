@@ -302,12 +302,18 @@ def _clamp_shield(hours):
     return max(0.0, min(3.0, h))
 
 
+_link_lock = threading.Lock()
+
+
 def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyController,
              bundle_id: str) -> None:
     """Execute the interactive link flow, feeding codes from the long-poll stream."""
     link_id = (event.get("payload") or {}).get("link_id")
     if not link_id:
         log.warning("link event without link_id; ignoring")
+        return
+    if not _link_lock.acquire(blocking=False):
+        log.warning("link already running; ignoring %s", link_id)
         return
     relay.register(link_id)
     result = {"status": "failed", "error": "unexpected"}
@@ -322,6 +328,7 @@ def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyCont
         )
     finally:
         evony.force_close_evony(bundle_id)
+        _link_lock.release()
     cloud.report_link(link_id, result)
     relay.clear()
 

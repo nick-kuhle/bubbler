@@ -179,10 +179,11 @@ class EvonyController:
                 return {"status": "failed", "error": "switch account dialog did not appear"}
             if not email or "@" not in str(email):
                 return {"status": "failed", "error": "link event has no email"}
+            log.info("dialog up; waiting before email")
+            time.sleep(1.8)
             log.info("entering email (len=%d)", len(email))
             self._enter_email(email)
-            time.sleep(1.0)
-            if not self._code_dialog_visible():
+            if not self._wait_for_code_dialog(12):
                 return {"status": "failed", "error": "email was not submitted"}
             if on_waiting_code:
                 on_waiting_code()
@@ -296,21 +297,28 @@ class EvonyController:
             log.info("verification code dialog visible")
         return ok
 
+    def _wait_for_code_dialog(self, timeout: float = 12.0) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._code_dialog_visible():
+                return True
+            time.sleep(1.4)
+        return False
+
     def _enter_email(self, email: str) -> None:
-        for _ in range(3):
-            self.t.tap(414, 830)
-            time.sleep(0.25)
-        time.sleep(0.8)
+        log.info("tap email field once")
+        self.t.tap(414, 830)
+        time.sleep(2.2)
         self.t.type_text(email)
-        time.sleep(0.4)
+        time.sleep(1.6)
         try:
             self.t.hide_keyboard()
         except Exception:
             pass
-        time.sleep(0.5)
+        time.sleep(1.2)
+        log.info("tap confirm once")
         self.t.tap(579, 1100)
-        time.sleep(0.4)
-        self.t.tap(620, 1090)
+        time.sleep(2.8)
 
     def _dialog_visible(self) -> bool:
         img = self._grab()
