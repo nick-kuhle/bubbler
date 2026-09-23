@@ -15,9 +15,9 @@ real user (docs: "force-close app after every run").
 
 from __future__ import annotations
 
+import io
 import logging
 import json
-import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -175,13 +175,15 @@ class EvonyController:
         """Drive the interactive link. `get_code` blocks until the orchestrator delivers the
         submitted 6-digit code (long-poll). Returns result dict (linked/failed/expired)."""
         try:
-            self.launch_login_screen(bundle_id)
-            time.sleep(0.6)
+            if not self.launch_login_screen(bundle_id):
+                return {"status": "failed", "error": "switch account dialog did not appear"}
+            time.sleep(0.5)
             self.tap_pair("email_login", "email")
             time.sleep(0.5)
             self.t.type_text(email)
             time.sleep(0.4)
             self.tap_pair("email_login", "continue")
+            time.sleep(1.2)
             if on_waiting_code:
                 on_waiting_code()
         except CalibrationMissing as extra:
@@ -214,44 +216,106 @@ class EvonyController:
             report_expired()                        # tell the wizard: ask the user again
             self.tap_resend()
 
-    def _account_icon_points(self) -> list[tuple[int, int]]:
-        """Gold person icon — ZXTouch/iOS screenshot pixels (828x1792)."""
+    def _login_icon_point(self) -> tuple[int, int]:
         spec = (self.cal.screens.get("email_login") or {}) if self.cal else {}
         raw = (spec.get("taps") or {}).get("email_button") or {"x": 50, "y": 248}
-        x, y = int(raw["x"]), int(raw["y"])
-        return [
-            (x, y), (56, 250), (44, 236), (62, 258), (38, 228),
-            (70, 252), (50, 220), (48, 268), (32, 240), (80, 248),
-        ]
+        return int(raw["x"]), int(raw["y"])
 
-    def launch_login_screen(self, bundle_id: str | None = None) -> None:
-        """Kill Evony, reopen it, and tap the account icon for the whole splash."""
+    def _grab(self):
+        try:
+            shot = self.t.screenshot()
+        except Exception as exc:
+            log.warning("screenshot failed: %s", exc)
+            return None
+        try:
+            from PIL import Image
+            img = Image.open(io.BytesIO(shot)).convert("RGB")
+        except Exception as exc:
+            log.warning("screenshot decode failed: %s", exc)
+            return None
+        if img.size[0] < 800 or img.size[1] < 1600:
+            return None
+        return img
+
+    def _is_splash(self, img) -> bool:
+        hits = n = 0
+        for x in range(40, 780, 16):
+            for y in range(80, 520, 16):
+                r, g, b = img.getpixel((x, y))
+                n += 1
+                if r > 140 and g < 140 and b < 90 and r > g + 40 and r > b + 60:
+                    hits += 1
+        return n > 0 and (hits / n) >= 0.12
+
+    def _is_switch_account(self, img) -> bool:
+        rows_ok = rows = 0
+        for y in range(720, 1000, 16):
+            hits = n = 0
+            for x in range(160, 670, 10):
+                r, g, b = img.getpixel((x, y))
+                n += 1
+                parchment = (
+                    155 <= r <= 200 and 135 <= g <= 175 and 90 <= b <= 135
+                    and abs(r - g) <= 35 and (g - b) >= 20 and (r - b) >= 35
+                )
+                if parchment:
+                    hits += 1
+            rows += 1
+            if n and hits / n >= 0.5:
+                rows_ok += 1
+        return rows > 0 and (rows_ok / rows) >= 0.35
+
+    def _dialog_visible(self) -> bool:
+        img = self._grab()
+        if img is None:
+            return False
+        ok = self._is_switch_account(img)
+        if ok:
+            log.info("switch account dialog visible")
+        return ok
+
+    def _wait_for_splash(self, timeout: float = 18.0) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            img = self._grab()
+            if img is not None:
+                if self._is_switch_account(img):
+                    log.info("switch account already visible during splash wait")
+                    return True
+                if self._is_splash(img):
+                    log.info("evony splash visible")
+                    return True
+            time.sleep(0.45)
+        return False
+
+    def launch_login_screen(self, bundle_id: str | None = None) -> bool:
         if not self.cal or "email_login" not in self.cal.screens:
             raise CalibrationMissing("no calibration for screen 'email_login'")
-        points = self._account_icon_points()
+        primary = self._login_icon_point()
+        points: list[tuple[int, int]] = []
+        for point in (primary, (56, 250), (40, 236)):
+            if point not in points:
+                points.append(point)
         log.info("login icon taps (px): %s", points)
-        stop = threading.Event()
-
-        def hammer():
-            i = 0
-            while not stop.is_set():
-                x, y = points[i % len(points)]
+        if bundle_id:
+            self.t.launch(bundle_id)
+        if not self._wait_for_splash(18):
+            log.warning("evony splash did not appear")
+            return False
+        if self._dialog_visible():
+            return True
+        for x, y in points:
+            for n in range(1, 5):
+                log.info("login icon tap %s,%s #%s", x, y, n)
                 try:
                     self.t.tap(x, y)
                 except Exception as exc:
                     log.warning("login tap failed: %s", exc)
-                i += 1
-                time.sleep(0.06)
-
-        th = threading.Thread(target=hammer, daemon=True)
-        th.start()
-        try:
-            if bundle_id:
-                self.t.launch(bundle_id)
-            time.sleep(18)
-        finally:
-            stop.set()
-            th.join(timeout=1)
+                time.sleep(0.5)
+            if self._dialog_visible():
+                return True
+            time.sleep(0.6)
+        return self._dialog_visible()
 
     def tap_resend(self) -> None:
         try:

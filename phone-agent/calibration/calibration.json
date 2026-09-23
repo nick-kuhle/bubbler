@@ -9,6 +9,9 @@
         "continue": {"x": 579, "y": 1100}
       }
     },
+    "switch_account": {
+      "template": "switch_account.png"
+    },
     "code_dialog": {
       "taps": {
         "code": {"x": 414, "y": 830},

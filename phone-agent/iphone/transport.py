@@ -203,13 +203,8 @@ class FridaTouch:
         """Force-kill Evony on the phone, then cold-start it."""
         if bundle_id != self.bundle_id:
             raise FridaDown(f"transport configured for {self.bundle_id}, not {bundle_id}")
-        try:
-            self._ensure_device()
-            self._kill_remote_processes()
-        except FridaDown as exc:
-            log.warning("frida kill skipped: %s", exc)
         close_app(bundle_id)
-        time.sleep(1.2)
+        time.sleep(0.6)
         try:
             self._touch.switch_to_app(bundle_id)
         except FridaDown:
@@ -277,10 +272,6 @@ class FridaTouch:
     def force_close(self, bundle_id: str) -> None:
         if bundle_id != self.bundle_id:
             raise FridaDown(f"transport configured for {self.bundle_id}, not {bundle_id}")
-        try:
-            self._kill_remote_processes()
-        except FridaDown:
-            pass
         close_app(bundle_id)
         self._script = None
         self._session = None
@@ -303,20 +294,27 @@ class FridaTouch:
 
 
 def close_app(bundle_id: str) -> None:
-    """Kill Evony on this device, or over SSH when the agent runs on a laptop."""
+    """Kill Evony once, then wait until it is gone."""
     leaf = bundle_id.rsplit(".", 1)[-1]
     names = [bundle_id, leaf, leaf.capitalize(), "Evony"]
-    for name in names:
-        subprocess.run(["killall", "-9", name], capture_output=True, check=False)
     key = Path("/tmp/opencode/bubbler_phone_ed25519")
     if key.exists():
-        remote = " ; ".join(f"killall -9 {n}" for n in names)
+        remote = " ; ".join(f"killall -9 {n} >/dev/null 2>&1" for n in names)
+        remote += (
+            '; i=0; while [ $i -lt 8 ]; do '
+            'ps aux | grep -i "[e]vony" | grep -v grep >/dev/null || break; '
+            'sleep 0.35; i=$((i+1)); done'
+        )
         subprocess.run(
             ["ssh", "-i", str(key), "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
              "mobile@192.168.1.166", remote],
             capture_output=True, check=False,
         )
-    time.sleep(0.8)
+        time.sleep(0.3)
+        return
+    for name in names:
+        subprocess.run(["killall", "-9", name], capture_output=True, check=False)
+    time.sleep(1.0)
 
 
 def wake_screen(command: str = "wake") -> None:

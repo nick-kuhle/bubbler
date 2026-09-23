@@ -273,9 +273,11 @@ def make_components(cfg: dict):
     # Keep bring-up safe until the operator captures real templates from this phone.
     enabled = bool(vision_cfg.get("enabled", False))
     calibration = None
-    calibration_path = calibration_cfg.get(
-        "manifest", str(ROOT / "calibration" / "calibration.json")
-    )
+    calibration_path = Path(str(calibration_cfg.get(
+        "manifest", ROOT / "calibration" / "calibration.json"
+    )))
+    if not calibration_path.is_absolute():
+        calibration_path = ROOT / calibration_path
     if bool(calibration_cfg.get("enabled", False)):
         calibration = load_calibration(str(calibration_path))
     if not enabled:
