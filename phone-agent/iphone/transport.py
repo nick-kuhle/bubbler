@@ -67,11 +67,12 @@ class ZXTouchClient:
     def tap(self, x: int, y: int) -> None:
         x10 = max(0, min(99999, int(round(x * 10))))
         y10 = max(0, min(99999, int(round(y * 10))))
-        down = f"11{1:02d}{x10:05d}{y10:05d}"
-        up = f"10{1:02d}{x10:05d}{y10:05d}"
-        self._send(self.TOUCH, down)
-        time.sleep(0.12)
-        self._send(self.TOUCH, up)
+        finger = f"{1:02d}{x10:05d}{y10:05d}"
+        self._send(self.TOUCH, "11" + finger)
+        time.sleep(0.04)
+        self._send(self.TOUCH, "12" + finger)
+        time.sleep(0.10)
+        self._send(self.TOUCH, "10" + finger)
 
     def screen_size(self) -> tuple[int, int]:
         self._send(13)
@@ -81,12 +82,17 @@ class ZXTouchClient:
         raise FridaDown(f"ZXTouch screen size failed: {line!r}")
 
     def type_text(self, text: str) -> None:
-        for character in text:
-            self._send(24, 1, character)
-            self._line()
+        if not text:
+            return
+        self._send(24, 1, text)
+        self._line()
 
     def show_keyboard(self) -> None:
         self._send(24, 2, 2)
+        self._line()
+
+    def hide_keyboard(self) -> None:
+        self._send(24, 2, 1)
         self._line()
 
     def screenshot(self) -> bytes:
@@ -192,12 +198,14 @@ class FridaTouch:
         self._touch._send(self._touch.TOUCH, f"10{5:02d}{int(x2 * 10):05d}{int(y2 * 10):05d}")
 
     def type_text(self, text: str) -> None:
-        log.debug("type_text (len=%d)", len(text))
+        log.info("type_text len=%d", len(text or ""))
+        self._touch.type_text(str(text or ""))
+
+    def hide_keyboard(self) -> None:
         try:
-            self._touch.show_keyboard()
+            self._touch.hide_keyboard()
         except Exception:
             pass
-        self._touch.type_text(str(text))
 
     def launch(self, bundle_id: str) -> None:
         """Kill Evony, then start it without waiting for the splash to finish."""

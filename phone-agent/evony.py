@@ -177,13 +177,13 @@ class EvonyController:
         try:
             if not self.launch_login_screen(bundle_id):
                 return {"status": "failed", "error": "switch account dialog did not appear"}
-            time.sleep(0.5)
-            self.tap_pair("email_login", "email")
-            time.sleep(0.5)
-            self.t.type_text(email)
-            time.sleep(0.4)
-            self.tap_pair("email_login", "continue")
-            time.sleep(1.2)
+            if not email or "@" not in str(email):
+                return {"status": "failed", "error": "link event has no email"}
+            log.info("entering email (len=%d)", len(email))
+            self._enter_email(email)
+            time.sleep(1.0)
+            if not self._code_dialog_visible():
+                return {"status": "failed", "error": "email was not submitted"}
             if on_waiting_code:
                 on_waiting_code()
         except CalibrationMissing as extra:
@@ -263,7 +263,54 @@ class EvonyController:
             rows += 1
             if n and hits / n >= 0.5:
                 rows_ok += 1
-        return rows > 0 and (rows_ok / rows) >= 0.35
+        if not (rows > 0 and (rows_ok / rows) >= 0.35):
+            return False
+        cr, cg, cb = img.getpixel((250, 1100))
+        return cr > 70 and cr > cg + 30 and cg < 90
+
+    def _code_dialog_visible(self) -> bool:
+        img = self._grab()
+        if img is None:
+            return False
+        cr, cg, cb = img.getpixel((250, 1100))
+        red_cancel = cr > 70 and cr > cg + 30 and cg < 90
+        if red_cancel:
+            return False
+        rows_ok = rows = 0
+        for y in range(720, 1000, 16):
+            hits = n = 0
+            for x in range(160, 670, 10):
+                r, g, b = img.getpixel((x, y))
+                n += 1
+                parchment = (
+                    155 <= r <= 200 and 135 <= g <= 175 and 90 <= b <= 135
+                    and abs(r - g) <= 35 and (g - b) >= 20 and (r - b) >= 35
+                )
+                if parchment:
+                    hits += 1
+            rows += 1
+            if n and hits / n >= 0.5:
+                rows_ok += 1
+        ok = rows > 0 and (rows_ok / rows) >= 0.35
+        if ok:
+            log.info("verification code dialog visible")
+        return ok
+
+    def _enter_email(self, email: str) -> None:
+        for _ in range(3):
+            self.t.tap(414, 830)
+            time.sleep(0.25)
+        time.sleep(0.8)
+        self.t.type_text(email)
+        time.sleep(0.4)
+        try:
+            self.t.hide_keyboard()
+        except Exception:
+            pass
+        time.sleep(0.5)
+        self.t.tap(579, 1100)
+        time.sleep(0.4)
+        self.t.tap(620, 1090)
 
     def _dialog_visible(self) -> bool:
         img = self._grab()
