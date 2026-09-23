@@ -1,6 +1,6 @@
 # LOL automatic bubble scheduler
 
-Scheduled, self-service peace-treaty (bubble) automation for **Evony: The King's Return**,
+Scheduled, self-service truce agreement (bubble) automation for **Evony: The King's Return**,
 for alliance **LOL** (we don't take things seriously — we just have fun).
 
 Users link their Evony account (Evony name + email + one-time 6-digit code), pick a schedule
