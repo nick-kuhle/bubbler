@@ -1,12 +1,18 @@
 # 04 — Evony game flow + verification
 
+**Verified milestone (operator report, 2026-09-23):** Evony email/code linking worked with
+new users and different emails in the current local-machine-assisted setup, including the
+load-account confirmation. This does **not** validate autonomous bubble runs, retries,
+vision-based shield verification or on-phone-only operation. The run flow below is a
+*target* and must pass [07 — cutover](07-cutover.md) before unattended use.
+
 ## Game mechanics we rely on
 
 - **Bubble = Truce Agreement** item. We use the **3-day** variant at **2500 gems** (operator-confirmed).
 - You **cannot activate a truce while an enemy army is actively attacking** your keep.
   Therefore we do **not** react to attacks — we keep an always-on shield topped up on
-  schedule. (A shield with >24h remaining cancels most risk; the scheduler skips re-applying
-  in that case.)
+  schedule. (A shield with >24h remaining cancels most risk; skipping an unnecessary
+  re-application is a target behavior, not currently proven.)
 - **Login is email + one-time 6-digit code.** The email-login control is the small **gold
   person icon in the top-left of the loading/connecting screen** (iPhone XR screenshot
   pixels ≈ 50,248). It is only tappable while the game is loading and may need repeated
@@ -19,7 +25,7 @@
 
 ## The two flows
 
-### A. Run flow (apply + verify a bubble) — event kind `run`
+### A. Target run flow (apply + verify a bubble) — event kind `run`
 
 ```
 claim job (from long-poll event)
@@ -28,8 +34,8 @@ claim job (from long-poll event)
   │
   ├─ launch Evony
   ├─ state check: "on the post-login world view?"
-  │     ├─ no, code prompt shown → abort as needs_code (surface re-link)
-  │     └─ no, not logged in → type email (fetched from the event payload); if code prompt appears → abort as needs_code
+  │     ├─ no, code prompt shown → abort (current run_one reports status=expired; re-link UX pending)
+  │     └─ no, not logged in → type email (fetched from the event payload); if code prompt appears → abort
   ├─ navigate: open shield/bubble item → select 3-day Truce (2500💎) → Activate → Confirm
   ├─ verify: screenshot → shield indicator present AND countdown readout ≥ 3 days − ε
   ├─ close Evony (back to home screen)
@@ -37,13 +43,14 @@ claim job (from long-poll event)
   └─ report (POST /api/agent/runs) + upload evidence screenshot
 ```
 
-Per-step truth-guards: after every tap/type, take a screenshot and confirm we are on the
-expected screen (template match). On mismatch → configured retries (default 2), then fail
-with the OCR'd screen state for diagnosis.
+**Target improvement:** after each tap/type, confirm the expected screen and retry a
+bounded number of times. Current run code relies heavily on coordinates/sleeps; it does
+not yet provide these guards or reliable OCR-based failure diagnosis.
 
 ### B. Link flow (first login / re-link) — event kinds `link` + `code`
 
-Interactive and resend-tolerant. Run by the same agent loop, on the phone.
+Interactive link flow; tested with new users/emails in the current setup. On-phone-only
+and resend/lost-event behavior remain cutover tests.
 
 ```
 ┌─ receive "link" event (evony email from the wizard)
@@ -52,21 +59,24 @@ Interactive and resend-tolerant. Run by the same agent loop, on the phone.
 │  (code now lands in the user's inbox; Evony shows the 90s entry screen)
 │
 │  wait (long-poll is open) for the "code" event carrying the 6 digits
-│      ├─ code arrives (≈1s after the user submits in the wizard) → type it → Confirm
-│      └─ expired? (code-entry screen countdown hit 0 / Evony rejects)
-│            → tap "resend" → (fresh code emailed, fresh 90s)
-│            → report so the wizard shows "expired, check email again"
-│            → loop back to waiting for the next "code" event
+│      ├─ code arrives while online → type it → Confirm → tap load-account Confirm
+│      └─ expired/rejected? (resend is a target, needs tests)
+│            → request fresh code, report state to wizard (not yet reliable)
+│            → wait for the next "code" event
 │
 ├─ verify: world view reached? → linked
 └─ report link status; close Evony
 ```
 
-Each resend grants a new 90s, so a human who is slow to check their email is never hard
-locked out. The *only* genuinely time-sensitive leg is code entry after the user submits,
-and long-polling delivers that in ~1s.
+A new code can be requested if an attempt expires, but automatic resend and recovery from
+lost/expired jobs need explicit end-to-end testing. Long-poll delivery is usually fast when
+both sides are online, not guaranteed within one second.
 
-## Vision layer (runs on the phone)
+## Vision layer (target: runs on the phone; calibration pending)
+
+The committed manifest currently has link-related entries only; required image templates
+are git-ignored and must be transferred/validated on the phone. Do not equate a working
+email-link with a verified truce application.
 
 - **Template matching (OpenCV `matchTemplate`)** on reference screenshots + ROI maps stored
   in `phone-agent/calibration/`:
@@ -82,18 +92,18 @@ and long-polling delivers that in ~1s.
 - Shield "up" = indicator present; "healthy" = remaining > 24h.
 
 ### Coordinates
-Fix the phone orientation and resolution once during calibration. All tap coordinates are
-defined relative to that canonical screenshot; the agent maps them with a single scale
-factor if the phone reports a different resolution.
+Fix the phone orientation and resolution once during calibration. Tap coordinates in the
+current controller are used **as-is** against the iPhone XR 828×1792 screenshots; it does
+not rescale to a different resolution.
 
 ## Edge cases
 
 | Case | Handling |
 |---|---|
-| Shield already >24h at schedule time | Skip run, mark ok, note remaining hours |
-| Code prompt at login | **needs_code**; web app shows "Re-link (new code)" |
-| Account switched to another device | Same as above (session revoked) |
-| Code expired mid-link | Phone taps **resend**; wizard prompts again; fresh 90s |
+| Shield already >24h at schedule time | Target: skip run, mark ok, note remaining hours; not yet verified/implemented as a shield-time guard |
+| Code prompt at login | Current `run_one` reports `expired`; re-link UX needs validation |
+| Account switched to another device | Treat as session revoked; re-link on a controlled test account |
+| Code expired mid-link | Agent may tap **resend**; automatic recovery not yet verified |
 | App update / new Evony UI version | Templates stale → run fails with mismatch; re-run calibration |
 | Frida down | Agent restart; verify frida-server and the Python binding over SSH |
 | Screen off / phone asleep | Wake the phone physically or with an installed jailbreak utility; the device is set not to auto-lock |
@@ -101,4 +111,5 @@ factor if the phone reports a different resolution.
 ## Timing & load
 
 - Target: a few minutes online per account per run, 3x/week, one account at a time.
-- The phone does the work natively, so there is no host CPU/RAM concern at all.
+- After cutover the phone will do the work natively; check on-device dependency/performance
+  and long-poll reconnect behavior during bring-up.

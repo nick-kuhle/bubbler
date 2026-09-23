@@ -11,18 +11,19 @@
 | Perma-signing | **TrollStore** (TrollInstallerX 1.0.3 → TrollStore) |
 | Package manager | **Sileo** |
 | Remote control | **OpenSSH** (rootless build, `/var/jb/usr/bin/...`) — over WiFi, for setup/debug only |
-| UDID | `00008020-001D4CE10AB8003A` |
 
 Why this device: **A12 (arm64e) has no public bootrom exploit** — checkm8 is A7–A11 only, so
 palera1n/checkra1n **cannot** jailbreak it. Dopamine is the supported route: Dopamine 3 covers
 iOS **15.0–17.3.1** on A8–A17/M1/M2, and specifically supported this A12 on 16.3.1 since
 Dopamine 2.0 (Feb 2024).
 
-## v2 change: the phone is now standalone
+## v2 target: phone standalone (**migration in progress**)
 
-Previously the phone was USB-tethered to an always-on N150 host that ran the agent. **That
-host is gone.** In v2 the phone itself runs the agent (a LaunchDaemon) and reaches the cloud
-directly over WiFi/LTE. USB/SSH is only used during setup and debugging, not in operation.
+The goal is to retire the local machine that currently supports the tested linking setup.
+In v2 the phone will run the agent as a LaunchDaemon and connect directly to Vercel over
+WiFi. This has **not yet been validated end-to-end on device**: do not shut down the
+working local setup until the [cutover tests](07-cutover.md) pass. SSH over WiFi is for
+setup/debug only, not a runtime dependency.
 
 ## How it was jailbroken (one-time, already done — record only)
 
@@ -40,8 +41,7 @@ Dopamine is **semi-untethered**: after any full reboot the jailbreak is inactive
 open the **Dopamine** app and tap **Jailbreak** again (~1 min, no computer needed). While it
 is inactive, **nothing runs** — no LaunchDaemon, no agent, and bubbles won't be applied.
 
-Since there is no longer a host machine to re-run the jailbreak for us, a phone reboot is a
-**manual recovery step**:
+After the host is retired, a phone reboot will be a **manual recovery step**:
 1. Someone physically taps the Dopamine app → Jailbreak → respring.
 2. A nice best-effort assist: **iOS Sleep/Wake + charging automation** can't open Dopamine,
    but a **Shortcuts automation** with a jailbreak helper can. Lowest-effort reliable option:
@@ -50,21 +50,25 @@ Since there is no longer a host machine to re-run the jailbreak for us, a phone 
 
 ## On-device agent installation (`phone-agent/`)
 
-The Python agent runs **on the phone**, reached via SSH over WiFi (setup only):
+The Python agent is **intended to run on the phone**, with SSH over WiFi for setup only:
 
-1. Install Python on the device:
-   - Sileo → **python3** (Procursus) and `pip` (`python3 -m ensurepip`).
-2. Ship the agent folder to `/var/jb/usr/libexec/bubbler/` (scp via SSH):
-   ```
-   scp -r phone-agent mobile@<phone-ip>:/var/jb/usr/libexec/bubbler/
-   ```
-   (rootless: user `mobile` owns `/var/mobile`; keep the agent under `/var/jb` where the
-   jailbreak userspace lives.)
-3. Create `/var/jb/Library/LaunchDaemons/com.bubbler.agent.plist` so the agent starts after
-   every respring/jailbreak (see `phone-agent/bootstrap/` for a ready plist + install script).
-   It runs `python3 /var/jb/usr/libexec/bubbler/agent.py` with `stderr` to a log file.
-4. Configure `/var/jb/usr/libexec/bubbler/config.yaml` (cloud URL + bearer token). Never
-   commit real values.
+1. Install Python on the device (Procursus/Sileo), plus the dependencies needed by the
+   link path (`requests`, `Pillow`, and a **working arm64e Python `frida` binding**); confirm
+   its release is compatible with the on-phone frida-server. Check local ZXTouch input and
+   screenshots. Do not assume a laptop Python wheel works on iOS.
+2. Clone the reviewed GitHub revision on the phone (e.g. to `/var/mobile/bubbler`); see
+   [07 — cutover](07-cutover.md). Copy `phone-agent/.` contents into
+   `/var/jb/usr/libexec/bubbler/` **as a root shell on the phone**. The earlier
+   `scp -r phone-agent .../bubbler/` form adds an extra `phone-agent/` directory and does
+   not match the plist path. `phone-agent/bootstrap/install.sh` expects to be run from the
+   checkout root on the phone with root privileges; stage dependencies and config before
+   letting it start the daemon.
+3. Store the real, mode-0600 `config.yaml` only in the installed agent directory, pointing
+   at the Vercel production URL and matching agent bearer token. Put necessary calibration
+   images on the phone by a separate, secure transfer (they are git-ignored).
+4. Install/load `com.bubbler.agent.plist` in `/var/jb/Library/LaunchDaemons/` only when the
+   config and local control services are ready. Verify `launchctl list`, logs, a phone-
+   initiated long-poll, and a respring. Never commit the real config or keys.
 
 ## Automation layer (on-device, Frida)
 
@@ -86,16 +90,19 @@ Check versions with `frida-server --version` and
   Keychain) is disabled on this dedicated device.
 - **Automatic iOS updates remain OFF** — never risk the jailbreak or Evony compatibility.
 
-## Calibration screenshots still needed (Phase "calibrate")
-Reference images for the vision layer — capture from the live device during a manual
-test login:
-1. Email-login entry point (the *email-login* button exists only in the **mobile app**).
-2. Email + 6-digit-code dialog.
-3. Post-login server/world view.
-4. Truce Agreement item — **3-day, 2500 gems**, and its activate + confirm dialogs.
-5. Shield-active indicator with countdown readout.
+## Calibration images for unattended runs (pending)
 
-Store these under `phone-agent/calibration/` with ROI maps (see `04-evony-flow.md`).
+The committed JSON manifest has link-related taps only, and screenshots/templates are
+excluded from Git. The operator's successful linking tests do not demonstrate that run
+screens were calibrated or installed on the phone. Capture/transfer and verify:
+
+1. Email-login and code dialogs (reuse privately held link assets if available).
+2. Post-login server/world view.
+3. Truce Agreement item — **3-day, 2500 gems**, and its activate + confirm dialogs.
+4. Shield-active indicator with countdown readout/ROI.
+
+Store the images securely on the phone under the installed agent's `calibration/`
+directory, with manifest references (see `04-evony-flow.md`).
 
 ## Physical setup conventions
 - Phone on WiFi (or LTE), charger wired, screen never auto-locks, orientation locked to the

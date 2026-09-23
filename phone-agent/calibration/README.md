@@ -1,49 +1,33 @@
-Calibration assets live here: reference screenshots + ROI maps (yaml), captured from the
-live device during the calibrate phase (see docs/03 § Calibration and docs/04 § Vision).
+# Calibration assets (phone-specific)
 
-Template name (PNG)        Screen it proves
--------------------------  -----------------------------------------
-email_login.png            email-login entry button (mobile app only)
-code_dialog.png            6-digit code entry (with countdown)
-world_view.png             post-login server/world screen
-truce_3day.png             the 3-day truce item (2500 gems)
-activate_confirm.png       activate / confirm dialogs
-shield_active.png          shield indicator (ROI YAML has the countdown crop)
+**Status:** The operator has successfully linked new users and email addresses in the
+current setup. The committed `calibration.json` has link-related coordinates for an
+iPhone XR (828 × 1792); it has **no complete world view / 3-day truce / shield verification
+entries**. Image templates are intentionally git-ignored and must be copied to the phone
+securely. Working linking is not proof that unattended bubble runs are calibrated.
 
-Each screenshot may be paired with a `<name>.yaml` describing tap points, e.g.
-email_login.yaml:
-    taps:
-      email_button:    {x: 50, y: 248}
-      email:           {x: 540, y: 780}
-      continue:        {x: 540, y: 900}
-code_dialog.yaml:
-    taps:
-      confirm:  {x: 540, y: 700}
-      resend:   {x: 540, y: 620}
-shield_active.yaml:
-    countdown_roi: [x, y, w, h]
-
-Coordinates are relative to the canonical screenshot; the agent scales them if the device
-reports a different resolution.
-
-The agent reads `calibration.json` (a standard-library JSON manifest) so PyYAML is not
-required on the phone. Example shape:
+The agent reads **`calibration.json`**, not per-screen YAML files. For example:
 
 ```json
 {
+  "screen": {"width": 828, "height": 1792},
   "screens": {
     "email_login": {
       "template": "email_login.png",
-      "taps": {
-        "email_button": {"x": 540, "y": 640},
-        "email": {"x": 540, "y": 780},
-        "continue": {"x": 540, "y": 900}
-      }
+      "taps": {"email_button": {"x": 50, "y": 248}}
     }
-  },
-  "shield_countdown_roi": [100, 100, 300, 80]
+  }
 }
 ```
 
-Capture real templates and coordinates from this phone before setting `vision.enabled` to
-`true`; the example above is illustrative and is not a usable calibration.
+The current controller uses tap coordinates as-is and assumes this screen size/orientation;
+it does not scale them to other resolutions. Capture on **this device**, verify exact
+screens/tap positions and guard all steps before enabling vision or unattended runs.
+Store image templates and ROI metadata in the installed agent's `calibration/` directory
+on the phone; do not add raw screenshots showing users/accounts to GitHub.
+
+Required run targets still include `world_view`, `truce_3day`, `activate_confirm`,
+`shield_active` and a shield countdown ROI. The code's vision helpers require additional
+on-device OpenCV/OCR dependencies if enabled (`vision.enabled` defaults to `false` in
+`config.example.yaml`); on-device install and screenshot matching must be tested. See
+[game flow](../../docs/04-evony-flow.md) and [cutover checklist](../../docs/07-cutover.md).

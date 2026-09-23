@@ -10,8 +10,13 @@ phone-agent/config.yaml
 *.pem
 *.key
 
-# Calibration images (large binaries — reference only via docs/ or a release)
+# Calibration images (device-specific and potentially contain member data)
 phone-agent/calibration/*.png
+phone-agent/calibration/*.jpg
+phone-agent/calibration/*.jpeg
+
+# Local SQLite state is not source code; use managed Postgres in production
+webapp/data/*.db*
 
 # Evidence / downloads
 downloads/

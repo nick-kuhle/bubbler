@@ -1,11 +1,17 @@
 # 01 — Product spec
 
+**Progress (2026-09-23):** Evony email/code linking has been completed and successfully
+tried with new users and different email addresses in the current test setup (operator
+report). This does not prove the phone-only/Vercel deployment or bubble runs. The sections
+below describe intended product behavior; see [07 — cutover](07-cutover.md) for the gates
+between the working link flow and unattended operation.
+
 ## Purpose
 
 Let an operator (the account owner) and their trusted circle keep Evony peace shields
 ("bubbles") up on a fixed schedule without ever opening the game manually. Members link
-their Evony account once, pick Mon/Wed/Fri-style schedules, and the system applies the
-**3-day Truce Agreement (2500 gems)** for each account and verifies it before closing the game.
+their Evony account once, pick Mon/Wed/Fri-style schedules, and the target system applies
+and verifies a **3-day Truce Agreement (2500 gems)** before closing the game.
 
 ## Users & roles
 
@@ -15,70 +21,81 @@ their Evony account once, pick Mon/Wed/Fri-style schedules, and the system appli
 
 ## Core feature set
 
-### 1. Email login
-- All users sign in with their linked Evony email (no password). Operator flag on the operator account.
-- Magic-link sessions: a one-time login URL is emailed; the link creates a signed session cookie.
+### 1. Email login (production requirement, **not yet implemented**)
+- Members should sign in with their linked Evony email (no password). Operator flag on the
+  operator account.
+- **Target:** email a one-time login URL, then issue a session cookie only when the member
+  opens that URL. **Current code:** `/api/auth/login` issues a cookie immediately to anyone
+  submitting an allowed email, with no email verification. If `AUTH_SEED` is unset, all
+  emails are accepted. This must be fixed before a public real-user Vercel rollout.
+- Signing in to the web app and entering Evony's one-time code during **account linking**
+  are different workflows. The latter is the workflow tested successfully.
 
-### 2. 5-step linking wizard
+### 2. Linking wizard
 
 Linking is **the interactive corner of the app** and the reason long-polling exists
-(see `02-architecture.md`). The phone is told to act *within ~1s* of every wizard step,
-and the 90-second code window is made retry-safe.
+(see `02-architecture.md`). In healthy tests the agent can act quickly after wizard steps;
+this is best effort, not a guaranteed ~1s response or recovery from a lost job.
 
 1. **Instructions** — explain linking a new Evony account.
-2. **Two inputs**:
-   - *"Please enter your Evony name"* — plaintext; this is the human key shown on the master list.
-   - *"Enter your Evony email"* — stored in plaintext; doubles as the app login and is typed
-     into the game on each automated run.
-   - On submit: the app creates a `link_session`, the phone is woken via the open long-poll
-     (≈1s), launches Evony, types the email, and taps "send code". **"Waiting for your phone…
-     this usually takes a few seconds."**
+2. **Account details**:
+   - *Evony name* — plaintext; this is the human key shown on the master list.
+   - *Evony email* — currently taken from the signed-in web account (not a separate wizard
+     input); stored in plaintext and sent to the agent for login.
+   - On submit: the app creates a `link_session`, then enqueues a `link` job for the
+     agent's next long-poll. The agent launches Evony and enters the email. The wizard
+     shows **"Waiting for your phone… this usually takes a few seconds."**
 3. **Six-digit code** — Evony emails the code and starts a ~90s countdown. The user enters
-   the 6 digits into the wizard; the app forwards them to the phone over the same open
-   long-poll (≈1s) so the phone types them with plenty of time left.
-   - If the code expires before delivery (rare): the phone taps **resend**, Evony emails a
-     fresh code + fresh 90s, and the wizard shows *"The code expired — a new one was just
-     sent to your email."* Nothing about the 90s window is a hard deadline.
+   the 6 digits into the wizard; the app briefly queues them for the agent's next poll,
+   which types them in Evony. This link path was tested with new users/emails.
+   - **Target retry behavior:** on expiry the agent taps **resend**, Evony emails a fresh
+     code, and the wizard prompts for it. Loss/retry after an interrupted delivery has
+     **not** been verified end-to-end and is a cutover test, not a current guarantee.
 4. **Schedule + gem acknowledgment** — pick weekdays/time (default Mon/Wed/Fri) and check a
     box acknowledging the 2500-gem cost.
-5. **Confirm** — on success, creates the user + schedule and marks the link complete.
+5. **Confirm** — once Evony reports the link complete, the wizard saves schedule slots
+   for the existing web user (created when they signed in).
 
-Privacy copy on the app (wizard + footer), verbatim:
-
-> Your Evony email is stored so we can sign you in and apply your scheduled bubbles. The
-> 6-digit code is used once and never stored.
+**Privacy-copy gate:** the proposed “code is never stored” wording is incorrect for the
+current implementation: a code is in a DB job until it is claimed; expired, unclaimed
+rows are not yet purged. The web UI must present accurate code-retention wording
+*after* the queue/expiry behavior is fixed; do not advertise a never-stored guarantee.
+See [05 — security](05-security.md).
 
 ### 3. Master list (operator only)
 Table of **Evony name · schedule (days/time) · next scheduled run · last-run status**.
-Emails are never shown to other users. The "next run" column shows the scheduled time; a
-small line notes *"results can take up to a minute to appear"*.
+Emails should not be shown to other users. The "next run" column shows the scheduled
+time; run status can be delayed by an offline phone, so avoid a hard completion time.
 
 ### 4. Dashboard (per user)
 - Link status, schedule editor, next-run ETA, last-run result + evidence screenshot,
-- **"Run now"** (manual trigger — applied by the phone within ~seconds via long-poll), and
-  a **"Re-link (new code)"** action for the rare case a session is revoked (see below).
+- **"Run now"** (manual trigger enqueues a job for the agent's next long-poll), and
+  a **"Re-link (new code)"** path if a session is revoked (see below). Automated run
+  execution and verification still need end-to-end tests.
 
 ### 5. Scheduler
-- **There is no cron.** Due runs are computed on demand from the `schedules` table when the
-  phone's long-poll asks ("is anything due *right now*?"). A run counts as due when the
-  current weekday + time matches a schedule and no run has been completed for that slot.
-- **Idempotency guard:** skip a scheduled run if the account already has a bubble with
-  **more than 24h remaining**.
-- Failed runs are recorded with reason and retried per retry policy; a run that finds the
-  session revoked is marked **"needs new code"** and the wizard re-link path is surfaced.
+- **No cron:** `fillDue()` checks the `slots` table on each agent poll for the current UTC
+  weekday + minute and inserts a uniquely keyed run job for that user/date/time. There is
+  currently no lease/ack, so jobs lost after claim are not automatically retried.
+- **Target idempotency guard:** skip applying a truce if >24h remains. Shield detection,
+  retries and evidence have **not** been proven end-to-end yet; do not turn on unattended
+  schedules until the [cutover tests](07-cutover.md) pass.
+- A revoked game session should surface a re-link path; validate that behavior during
+  run testing rather than assuming a missing code will always be detected.
 
 ### 6. Runtime model
-- Web app + **on-device phone agent**: always on.
-- Evony client: **boot-on-demand only**. Opened to apply a bubble, verified, then closed —
-  never left idling online (a new-device login kicks the online user, so we never risk that).
+- **Target:** Vercel web app + on-device agent remain available. This has not yet been
+  validated after removing the local host.
+- Evony client: **boot-on-demand only**. Opened to link/apply a bubble, then closed to avoid
+  idling online (a new-device login kicks the online user).
 
 ## UI copy rules
 
-- The wizard and dashboard say the truth about latency: events are delivered by an
-  always-open connection, so status and "run now" are **~instant (worst case ~1 minute)**.
-  A short reassurance line may be shown near run status, e.g.
-  *"Results can take up to ~1 minute to appear."* Do **not** claim 5 minutes.
-- During linking step 2/3, tell the user the phone will act within seconds.
+- In healthy operation events usually arrive within seconds; a 45-second held request
+  alone does *not* guarantee a one-minute maximum when the phone is offline or the API
+  fails. Present delays as estimates, not an SLA.
+- During linking, explain that the agent must be online and ask the user to wait for the
+  code and an explicit confirmation of linking.
 
 ## Out of scope (v1)
 
@@ -91,5 +108,6 @@ small line notes *"results can take up to a minute to appear"*.
 
 - HTTPS everywhere (Vercel provides it).
 - Runs are short (target a few minutes), 3x/week — the phone stays idle otherwise.
-- Emails live in the app DB and are sent to the phone per-event over the long-poll; the
-  6-digit code is delivered once and deleted, never stored or logged.
+- Emails live in the app DB and are sent to the agent per-event over the long-poll. Codes
+  currently exist temporarily in DB job payloads; purge expired code jobs and verify
+  cleanup/logging before making stronger privacy claims.
