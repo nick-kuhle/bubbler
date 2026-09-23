@@ -13,7 +13,7 @@ API + DB).
 
 1. **Login** — email sign-in (the linked Evony email), operator flag.
 2. **5-step linking wizard** — instructions → Evony name + email (stored; app login) →
-   6-digit code (memory only) → schedule (default Mon/Wed/Fri) + 7500💎 ack → confirm.
+    6-digit code (memory only) → schedule (default Mon morning / Wed morning / Fri evening) + 2500💎 ack → confirm.
 3. **Master list (operator)** — Evony name · schedule · next run · last-run status.
 4. **Per-user dashboard** — status, evidence screenshot, "Run now", "Re-link (new code)".
 

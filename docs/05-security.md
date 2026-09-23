@@ -17,7 +17,7 @@ never reachable from the internet:
   setup/debug only; disable it or firewall it off when not in use.
 - The phone's only internet-facing identity is the Vercel endpoint it talks to, which
   requires `Authorization: Bearer <agent_token>`.
-- Hermes Touch binds to `127.0.0.1` only — reachable only by the on-device agent.
+- frida-server binds to `127.0.0.1` only — reachable only by the on-device agent.
 
 ## Data handling rules
 
@@ -36,7 +36,7 @@ never reachable from the internet:
 ## Transport
 
 - Phone ↔ cloud: HTTPS (TLS) both ways, outbound from the phone only.
-- Phone-side: Hermes Touch on `127.0.0.1`; SSH (WiFi) for setup only, then disabled.
+- Phone-side: frida-server on `127.0.0.1`; SSH (WiFi) for setup only, then disabled.
 
 ## Threat model (brief)
 

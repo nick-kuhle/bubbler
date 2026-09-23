@@ -10,7 +10,7 @@ type MasterData = {
   operator: string;
   slots: Array<{
     id: string; weekday: number; time: string; user_id: string;
-    evony_name: string; email: string; active: number;
+    evony_name: string; active: number;
   }>;
   runs: Array<{ kind: string; status: string; shield_hours_remaining: number | null; created_at: string; evony_name: string }>;
 };
@@ -37,25 +37,24 @@ export default function Master() {
 
   return (
     <section className="card">
-      <h2>bubbler · master runs</h2>
+      <h2>LOL · master runs</h2>
       <p className="muted">
-        operator <strong>{data.operator}</strong> — every claimed job for the circle, newest first.
+        operator <strong>{data.operator}</strong> — every claimed job for alliance LOL, newest first.
       </p>
 
       <h3 style={{ marginTop: "1.2rem" }}>slots</h3>
       <table>
-        <thead><tr><th>player</th><th>email</th><th>day</th><th>time</th><th>active</th></tr></thead>
+        <thead><tr><th>player</th><th>day</th><th>time</th><th>active</th></tr></thead>
         <tbody>
           {data.slots.map((s) => (
             <tr key={s.id}>
               <td>{s.evony_name}</td>
-              <td className="muted">{s.email}</td>
               <td>{dayName(s.weekday)}</td>
               <td>{s.time}</td>
               <td>{s.active ? "yes" : "no"}</td>
             </tr>
           ))}
-          {data.slots.length === 0 && <tr><td colSpan={5} className="muted">no slots yet</td></tr>}
+          {data.slots.length === 0 && <tr><td colSpan={4} className="muted">no slots yet</td></tr>}
         </tbody>
       </table>
 

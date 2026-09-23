@@ -1,1 +1,2 @@
 requests>=2.31
+frida>=16.5

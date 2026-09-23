@@ -1,11 +1,13 @@
-# bubbler
+# LOL automatic bubble scheduler
 
-Scheduled, self-service peace-treaty (bubble) automation for **Evony: The King's Return**.
+Scheduled, self-service peace-treaty (bubble) automation for **Evony: The King's Return**,
+for alliance **LOL** (we don't take things seriously — we just have fun).
 
 Users link their Evony account once (Evony name + email + one-time 6-digit code), pick a
-schedule (default Mon/Wed/Fri), and the system automatically applies the **3-day Truce
-Agreement** (7500 gems), verifies the shield is up, and closes the game again. No emulator,
-no VPS, no backend protocol reverse-engineering: the real Evony app runs on a real device.
+schedule (default Mon morning / Wed morning / Fri evening UTC), and the system automatically
+applies the **3-day Truce Agreement** (2500 gems), overlapping so there is no lapse, verifies
+the shield is up, and closes the game again. No emulator, no VPS, no backend protocol
+reverse-engineering: the real Evony app runs on a real device.
 
 ## Topology (v2 — zero always-on host machines)
 
@@ -28,7 +30,7 @@ domain.
                        │  PHONE — jailbroken iPhone XR (always-on)      │
                        │  on-device Python agent (LaunchDaemon)         │
                        │  long-polls /api/agent/events → drives Evony   │
-                       │  via Hermes Touch (tap/type/screenshot, local) │
+                        │  via Frida + ZXTouch (tap/type/screenshot)    │
                        │  OpenCV/Apple Vision verify → reports to cloud │
                        └────────────────────────────────────────────────┘
 ```
@@ -67,7 +69,7 @@ README.md          this file
 docs/
   01-product.md    product spec: linking flow, wizard, master list, schedules
   02-architecture.md  system design: Vercel-converged topology, long-poll API, DB schema
-  03-phone-hardware.md device build: jailbreak, Hermes Touch, agent bootstrap
+  03-phone-hardware.md device build: jailbreak, Frida bridge, agent bootstrap
   04-evony-flow.md  game mechanics + run/link flows + calibration targets
   05-security.md   outbound-only phone, tokens, code handling, ops guidelines
   06-runbook.md    phone bring-up, agent install, troubleshooting
@@ -80,7 +82,7 @@ phone-agent/       on-device Python agent (long-poll loop, Evony orchestration, 
 - Device is **jailbroken and online** (Dopamine 3 rootless, iOS 16.3.1). It is now a
   standalone appliance on WiFi — no host computer is needed.
 - Web app scaffold + phone-agent scaffold: **built** (see per-folder READMEs). Calibration
-  screenshots, Hermes-Touch-on-rootless verification, and first end-to-end run remain.
+  screenshots, Frida bridge verification, and first end-to-end run remain.
 - The **90s code window**, **long-poll event delivery**, and **resend-tolerant linking**
   are the core design and are implemented in the API contract + agent loop.
 

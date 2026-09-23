@@ -7,6 +7,20 @@ cloud:
 
 phone:
   evony_bundle_id: com.topgamesinc.evony   # UPDATE once installed; capture via ideviceinstaller
+  frida_host: 127.0.0.1                    # local frida-server on the phone
+  frida_port: 27042
+  zxtouch_host: 127.0.0.1                 # ZXTouch rootless socket
+  zxtouch_port: 6000
+  zxtouch_template_dir: /var/jb/usr/libexec/bubbler/calibration
+
+vision:
+  enabled: false                  # set true after calibration assets are captured
+  tesseract_cmd: tesseract
+
+calibration:
+  enabled: true
+  manifest: calibration/calibration.json
+  directory: calibration
 
 schedule:
   slots:                   # per-slot model — each day its own time, UTC

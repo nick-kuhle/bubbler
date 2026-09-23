@@ -1,0 +1,7 @@
+{
+  "name": "bubbler-frida-agent",
+  "private": true,
+  "devDependencies": {
+    "frida-objc-bridge": "^8.0.0"
+  }
+}

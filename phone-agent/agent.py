@@ -30,10 +30,29 @@ import requests
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from evony import EvonyController, run_one            # noqa: E402
-from iphone.transport import HermesTouch              # noqa: E402
+from evony import EvonyController, load_calibration, run_one  # noqa: E402
+from iphone.transport import FridaTouch              # noqa: E402
+from vision import TemplateLibrary, find_template, ocr_region, parse_shield_countdown  # noqa: E402
 
 log = logging.getLogger("bubbler.agent")
+
+
+class ConfiguredVision:
+    """Bind the stateless vision helpers to this device's template library."""
+
+    def __init__(self, library: TemplateLibrary, tesseract_cmd: str):
+        self.library = library
+        self.tesseract_cmd = tesseract_cmd
+
+    def find_template(self, screen: bytes, template: str):
+        return find_template(screen, template, self.library)
+
+    def ocr_region(self, screen: bytes, roi):
+        return ocr_region(screen, roi, self.tesseract_cmd)
+
+    @staticmethod
+    def parse_shield_countdown(text: str) -> float:
+        return parse_shield_countdown(text)
 
 
 # ---------------------------------------------------------------------------
@@ -178,11 +197,12 @@ class CloudClient:
         return r.json().get("run_id")
 
     def upload_evidence(self, run_id: str, png: bytes) -> str | None:
-        """Raw PNG bytes (Content-Type: image/png); the route reads req.arrayBuffer()."""
+        """Raw PNG/JPEG bytes; the route detects the image type from its magic bytes."""
+        content_type = "image/jpeg" if png[:3] == b"\xff\xd8\xff" else "image/png"
         r = self.session.post(
             f"{self.base_url}/api/agent/runs/{run_id}/evidence",
             data=png,
-            headers={"Content-Type": "image/png"},
+            headers={"Content-Type": content_type},
             timeout=30,
         )
         r.raise_for_status()
@@ -218,7 +238,10 @@ class CodeRelay:
             self._codes.put(str(payload.get("code")))
 
     def get_code(self):
-        return self._codes.get(timeout=120)
+        try:
+            return self._codes.get(timeout=180)
+        except queue.Empty:
+            return None
 
     def report_expired(self):
         if self.active_link_id:
@@ -234,8 +257,36 @@ class CodeRelay:
 
 def make_components(cfg: dict):
     phone = cfg["phone"]
-    transport = HermesTouch(phone.get("hermes_touch_url", "http://127.0.0.1:8887"))
-    evony = EvonyController(transport, vision=None, calibration=None)
+    transport = FridaTouch(
+        phone["evony_bundle_id"],
+        host=str(phone.get("frida_host", "127.0.0.1")),
+        port=int(phone.get("frida_port", 27042)),
+        touch_host=str(phone.get("zxtouch_host", "127.0.0.1")),
+        touch_port=int(phone.get("zxtouch_port", 6000)),
+    )
+    transport.configure_templates(str(phone.get(
+        "zxtouch_template_dir",
+        (cfg.get("calibration", {}) or {}).get("directory", "calibration"),
+    )))
+    vision_cfg = cfg.get("vision", {}) or {}
+    calibration_cfg = cfg.get("calibration", {}) or {}
+    # Keep bring-up safe until the operator captures real templates from this phone.
+    enabled = bool(vision_cfg.get("enabled", False))
+    calibration = None
+    calibration_path = calibration_cfg.get(
+        "manifest", str(ROOT / "calibration" / "calibration.json")
+    )
+    if bool(calibration_cfg.get("enabled", False)):
+        calibration = load_calibration(str(calibration_path))
+    if not enabled:
+        evony = EvonyController(transport, vision=None, calibration=calibration)
+    else:
+        library = TemplateLibrary(
+            str(calibration_cfg.get("directory", Path(calibration_path).parent)),
+            enabled=True,
+        )
+        vision = ConfiguredVision(library, str(vision_cfg.get("tesseract_cmd", "tesseract")))
+        evony = EvonyController(transport, vision=vision, calibration=calibration)
     return CloudClient(cfg["cloud"]["base_url"], cfg["cloud"]["agent_token"]), evony
 
 
@@ -259,13 +310,13 @@ def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyCont
     relay.register(link_id)
     result = {"status": "failed", "error": "unexpected"}
     try:
-        evony.open_evony(bundle_id)
         cloud.report_link(link_id, {"status": "awaiting_phone"})
-        cloud.report_link(link_id, {"status": "awaiting_code"})
+        evony.open_evony(bundle_id, settle=0.05)
         result = evony.link_login(
             event.get("email", ""),
             get_code=relay.get_code,
             report_expired=relay.report_expired,
+            on_waiting_code=lambda: cloud.report_link(link_id, {"status": "awaiting_code"}),
         )
     finally:
         evony.force_close_evony(bundle_id)

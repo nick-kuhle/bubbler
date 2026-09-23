@@ -2,7 +2,7 @@
 // The code is delivered to the phone as a jobs.code event over the same long-poll, with a
 // short TTL (the Evony ~90s entry window). Delivered once, never stored or logged.
 import { NextRequest, NextResponse } from "next/server";
-import { requireLogin } from "@/lib/auth";
+import { currentUser, unauthorized } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { nid, nowIso, addSecondsIso } from "@/lib/id";
 
@@ -13,7 +13,8 @@ export const maxDuration = 30;
 const CODE_TTL_SECONDS = 95;
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ link_id: string }> }) {
-  const user = await requireLogin();
+  const user = await currentUser();
+  if (!user) return unauthorized();
   const { link_id } = await params;
   const body = (await req.json().catch(() => ({}))) as { code?: string };
   const code = String(body.code || "").replace(/\D/g, "");

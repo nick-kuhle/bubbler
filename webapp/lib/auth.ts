@@ -7,7 +7,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { db } from "./db";
 import { nid, nowIso, addDaysIso } from "./id";
 
@@ -49,11 +49,19 @@ export function bearerToken(req: NextRequest): string | null {
   return m ? m[1].trim() : null;
 }
 
+export function unauthorized(): NextResponse {
+  return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+}
+
 export async function verifyBearer(
   req: NextRequest,
 ): Promise<CurrentUser | null> {
   const token = bearerToken(req);
   if (!token) return null;
+  const agentToken = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.["AGENT_BEARER_TOKEN"];
+  if (agentToken && token === agentToken) {
+    return { id: "agent", email: "agent@bubbler", evony_name: "agent", is_operator: true };
+  }
   const d = db();
   const row = await d.get(
     `SELECT u.id, u.email, u.evony_name, u.is_operator

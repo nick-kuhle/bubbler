@@ -1,7 +1,7 @@
 // app/api/master/route.ts — operator-only master list: every slot + run, latest first.
 // Per-slot model: each (day, time) row is listed separately — no weekdays mask.
 import { NextResponse } from "next/server";
-import { requireOperator } from "@/lib/auth";
+import { currentUser, unauthorized } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -9,10 +9,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export async function GET() {
-  const op = await requireOperator();
+  const op = await currentUser();
+  if (!op) return unauthorized();
+  if (!op.is_operator) return NextResponse.json({ error: "operator-only" }, { status: 403 });
   const d = db();
   const slots = await d.all(
-    `SELECT s.id, s.weekday, s.time, s.user_id, u.evony_name, u.email, s.active
+    `SELECT s.id, s.weekday, s.time, s.user_id, u.evony_name, s.active
        FROM slots s JOIN users u ON u.id = s.user_id
       ORDER BY u.evony_name, s.weekday, s.time`,
   );

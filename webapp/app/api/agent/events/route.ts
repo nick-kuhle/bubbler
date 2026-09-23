@@ -13,22 +13,32 @@ export const dynamic = "force-dynamic";
 // Hobby cap is 60s; our holds fit well under it.
 export const maxDuration = 60;
 
+function publicError(err: unknown): string {
+  return String(err instanceof Error ? err.message : err)
+    .replace(/postgres(?:ql)?:\/\/[^@\s]+@/g, "postgres://***@")
+    .slice(0, 240);
+}
+
 export async function GET(req: NextRequest) {
-  const agent = await verifyBearer(req);
-  if (!agent) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  try {
+    const agent = await verifyBearer(req);
+    if (!agent) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
-  await fillDue();
+    const rawHold = req.nextUrl.searchParams.get("hold");
+    const holdMs = Math.min(Math.max(Number(rawHold) || 40, 5), 46) * 1000;
+    const seen0 = Date.now();
 
-  const rawHold = req.nextUrl.searchParams.get("hold");
-  const holdMs = Math.min(Math.max(Number(rawHold) || 40, 5), 46) * 1000;
-  const seen0 = Date.now();
+    await fillDue();
+    let evt = await claimNext();
+    while (!evt && Date.now() - seen0 < holdMs - 800) {
+      await new Promise((r) => setTimeout(r, 1500));
+      await fillDue();
+      evt = await claimNext();
+    }
 
-  let evt = await claimNext();
-  while (!evt && Date.now() - seen0 < holdMs - 800) {
-    await new Promise((r) => setTimeout(r, 1500));
-    evt = await claimNext();
+    if (!evt) return NextResponse.json({ ok: true, event: null });
+    return NextResponse.json({ ok: true, event: evt });
+  } catch (err) {
+    return NextResponse.json({ ok: false, error: publicError(err) }, { status: 500 });
   }
-
-  if (!evt) return NextResponse.json({ ok: true, event: null });
-  return NextResponse.json({ ok: true, event: evt });
 }

@@ -28,8 +28,16 @@ export interface DB {
 let impl: DB | null = null;
 let engine: "sqlite" | "pg" | null = null;
 
+function runtimeEnv(name: string): string | undefined {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  return env?.[name];
+}
+
 const url = (): string =>
-  process.env.DATABASE_URL ?? "file:" + path.join("data", "bubbler.db");
+  runtimeEnv("DATABASE_URL") ||
+  runtimeEnv("POSTGRES_URL") ||
+  runtimeEnv("POSTGRES_PRISMA_URL") ||
+  "file:" + path.join("data", "bubbler.db");
 
 const isPg = (u: string): boolean =>
   u.startsWith("postgres://") || u.startsWith("postgresql://");

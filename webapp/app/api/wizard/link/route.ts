@@ -3,7 +3,7 @@
 // long-poll (≈1s later). The phone launches Evony, taps the email-login loading-screen
 // button, types the email, taps "send code" — then waits for the code event.
 import { NextRequest, NextResponse } from "next/server";
-import { requireLogin } from "@/lib/auth";
+import { currentUser, unauthorized } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { nid, nowIso, addSecondsIso, addMinutesIso } from "@/lib/id";
 
@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
-  const user = await requireLogin();
+  const user = await currentUser();
+  if (!user) return unauthorized();
   const body = (await req.json().catch(() => ({}))) as { evony_name?: string; email?: string };
 
   const email = String(body.email || user.email).trim().toLowerCase();

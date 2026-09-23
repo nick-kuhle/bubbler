@@ -1,7 +1,7 @@
 // app/api/runs/now/route.ts — "Run now". Any member may run for themselves; operators may
 // pass a target user_id. Enqueues a manual run job (uniq=null, so it can fire anytime).
 import { NextRequest, NextResponse } from "next/server";
-import { requireLogin, requireOperator } from "@/lib/auth";
+import { currentUser, requireOperator, unauthorized } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { nid, nowIso, addMinutesIso } from "@/lib/id";
 
@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
-  const user = await requireLogin();
+  const user = await currentUser();
+  if (!user) return unauthorized();
   const body = (await req.json().catch(() => ({}))) as { user_id?: string };
 
   let targetId = user.id;

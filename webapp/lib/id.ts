@@ -40,8 +40,8 @@ export function maskHas(mask: number, d: number): boolean {
 }
 
 export function isoWeekday(d: Date = new Date()): number {
-  // JS getDay(): 0=Sun…6=Sat → ISO 1=Mon…7=Sun
-  return ((d.getDay() + 6) % 7) + 1;
+  // JS getUTCDay(): 0=Sun…6=Sat → ISO 1=Mon…7=Sun. Slots are UTC.
+  return ((d.getUTCDay() + 6) % 7) + 1;
 }
 
 /** "HH:MM" from a scheduled time string like "08:30". */

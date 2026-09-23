@@ -2,9 +2,9 @@
 graph TD
     subgraph PHONE["Jailbroken iPhone XR (always-on, on WiFi)"]
         AGENT["phone-agent/agent.py<br/>long-poll loop"]
-        EVON["Hermes Touch (localhost:8887)<br/>tap/type/screenshot/typeText"]
+        EVON["Frida + ZXTouch<br/>27042 attach, 6000 touch/screenshot"]
         APP["Evony app (real client)"]
-        AGENT -->|drives via HTTP| EVON
+        AGENT -->|attach + system input| EVON
         EVON -->|taps/types| APP
     end
 
@@ -59,9 +59,9 @@ Events delivered over long-poll:
 - `agent.py` — main loop: long-poll GET /api/agent/events; dispatch event; report via
   POST /api/agent/runs.
 - `evony.py` — orchestration: launch Evony, guard each screen (email login → code dialog →
-  world view), apply 3-day Truce (7500 gems), verify countdown ≥3d, close.
+  world view), apply 3-day Truce (2500 gems), verify countdown ≥3d, close.
 - `vision.py` — OpenCV template match + tesseract OCR on device.
-- `iphone/transport.py` — Hermes Touch HTTP client (localhost). No USB, no host machine.
+- `iphone/transport.py` — local Frida transport and UIKit bridge. No USB, no host machine.
 - Runs as a LaunchDaemon (bootstrap/com.bubbler.agent.plist) so it survives resprings between
   bubbles.
 
@@ -71,5 +71,5 @@ opened when actually applying/verifying, then closed — the game is never left 
 ## 03 — Transport
 
 - Phone → cloud: HTTPS (bearer token) — outbound only, survives NAT, no tunnel needed.
-- Phone → Evony: Hermes Touch over localhost HTTP (tap/type/screenshot).
+- Phone → Evony: Frida session to the local frida-server (tap/type/screenshot RPC).
 - Deployment: webapp → `vercel deploy --prod` (see 06-runbook); agent → ssh (setup only).

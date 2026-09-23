@@ -66,24 +66,20 @@ The Python agent runs **on the phone**, reached via SSH over WiFi (setup only):
 4. Configure `/var/jb/usr/libexec/bubbler/config.yaml` (cloud URL + bearer token). Never
    commit real values.
 
-## Automation layer (on-device, localhost)
+## Automation layer (on-device, Frida)
 
-**Hermes Touch** exposes an HTTP REST API **on the phone itself** (`http://127.0.0.1:8887`).
-The agent calls it over localhost:
+The agent uses the Python Frida binding to attach to the running Evony process through a
+local `frida-server` at `127.0.0.1:27042`. The rootless ZXTouch service provides system-level
+Unity touches and JPEG screenshots at `127.0.0.1:6000`; Frida remains available for process
+inspection and launch coordination. App close remains a local process termination.
 
-```
-POST /touch      {"x": <int>, "y": <int>}     single tap / coordinate
-POST /swipe      {"x1","y1","x2","y2", ...}
-POST /typeText   {"text": "..."}              paste/type text
-POST /launch     {"bundle": "com.xxx.evony"}  (launch an app by bundle id)
-GET  /screenshot                              PNG of the current screen
-```
+The previous direct HID experiment was removed after it caused an Evony Unity crash on this
+iOS 16.3.1 device. Do not send raw `IOHIDEvent` payloads from Frida. ZXTouch is the
+rootless-compatible system-level touch boundary for this build.
 
-- **Open item:** verify/build Hermes Touch for **rootless Dopamine / arm64e on iOS 16**. It
-  predates rootless; it may need a rootless rebuild. Fallbacks: AutoTouch, or an
-  accessibility-based tweak (same localhost HTTP surface).
-- Screenshot capture fallbacks: Hermes `GET /screenshot`, or `screencapture` CLI from Sileo,
-  or the agent's own xcb/screencapture helper.
+The phone must have both `frida-server` and the matching Python `frida` package installed.
+Check versions with `frida-server --version` and
+`python3 -c 'import frida; print(frida.__version__)'`.
 
 ## Evony app on the device
 - Installed from the App Store with the operator's Apple ID; iCloud sync (Photos/Messages/
@@ -96,7 +92,7 @@ test login:
 1. Email-login entry point (the *email-login* button exists only in the **mobile app**).
 2. Email + 6-digit-code dialog.
 3. Post-login server/world view.
-4. Truce Agreement item — **3-day, 7500 gems**, and its activate + confirm dialogs.
+4. Truce Agreement item — **3-day, 2500 gems**, and its activate + confirm dialogs.
 5. Shield-active indicator with countdown readout.
 
 Store these under `phone-agent/calibration/` with ROI maps (see `04-evony-flow.md`).

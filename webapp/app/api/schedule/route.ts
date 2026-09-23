@@ -4,7 +4,7 @@
 // insert). Sending only { active } toggles all of the user's slots without touching them.
 // weekday: ISO 1=Mon … 7=Sun. time: "HH:MM" in UTC (= Evony server time). 1..7 slots.
 import { NextRequest, NextResponse } from "next/server";
-import { requireLogin } from "@/lib/auth";
+import { currentUser, unauthorized } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { nid, nowIso } from "@/lib/id";
 
@@ -17,7 +17,8 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 type BodySlot = { weekday?: number; time?: string; shield_hours?: number; active?: boolean };
 
 export async function POST(req: NextRequest) {
-  const user = await requireLogin();
+  const user = await currentUser();
+  if (!user) return unauthorized();
   const body = (await req.json().catch(() => ({}))) as {
     slots?: BodySlot[];
     shield_hours?: number;

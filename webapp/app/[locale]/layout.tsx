@@ -29,9 +29,9 @@ export async function generateMetadata({
   const { locale } = await params;
   // iScout-style: a canonical URL per language + hreflang alternates for every locale.
   return {
-    title: "bubbler",
+    title: "LOL automatic bubble scheduler",
     description:
-      "Hands-off peace-shield keeper for our Evony circle — bubbles open on schedule, so nobody's city burns while we're asleep.",
+      "Alliance LOL — we don't take things seriously. Automatic overlapping 3-day Evony bubbles, so nobody's city burns while we're asleep.",
     alternates: {
       canonical: `${baseUrl}/${locale}`,
       languages: {
@@ -60,9 +60,13 @@ export default async function LocaleLayout({
     <html lang={locale}>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
+          <div className="bubbles" aria-hidden>
+            <span /><span /><span /><span /><span />
+          </div>
           <header className="shell">
             <Link href="/" className="brand">
-              {dict.brandShort}
+              <span className="lol">LOL</span>
+              bubbler
             </Link>
             <nav>
               <Link href="/dashboard">{dict.nav.dashboard}</Link>

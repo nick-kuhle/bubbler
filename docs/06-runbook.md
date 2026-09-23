@@ -30,6 +30,69 @@ ssh mobile@<phone-ip> 'launchctl unload /var/jb/Library/LaunchDaemons/com.bubble
 ssh mobile@<phone-ip> 'launchctl load   /var/jb/Library/LaunchDaemons/com.bubbler.agent.plist'
 ```
 
+## 2a. Frida bring-up and first transport test
+
+Hermes is not used. Install the Frida server package from Sileo (the official Frida
+repository is `https://build.frida.re/`) and install the rootless ZXTouch package for
+system-level Unity input/screenshots. Confirm the Frida server and Python binding are the
+same release family. Run these commands over SSH:
+
+```bash
+ssh mobile@<phone-ip>
+/var/jb/usr/bin/frida-server --version
+/var/jb/usr/bin/python3 -c 'import frida; print(frida.__version__)'
+```
+
+If Sileo installed the server at a different path, use the path shown by `which frida-server`.
+If the Python import fails, do not start the agent: the current transport needs the Python
+Frida binding wherever `agent.py` runs. For the first test, it is supported to run the agent
+on the development computer and set `phone.frida_host` to the phone's Wi-Fi address. This
+avoids trying to compile a Python extension for iOS. The final standalone layout requires an
+arm64e-compatible Python Frida binding installed on the phone.
+
+Start the server only if the Sileo package did not already start it:
+
+```bash
+ssh mobile@<phone-ip> '/var/jb/usr/bin/frida-server -l 127.0.0.1:27042 >/var/jb/usr/libexec/frida-server.log 2>&1 &'
+```
+
+For a laptop-side first test, expose that local-only port through SSH:
+
+```bash
+ssh -N -L 27042:127.0.0.1:27042 mobile@<phone-ip>
+ssh -N -L 6000:127.0.0.1:6000 mobile@<phone-ip>
+```
+
+The rootless ZXTouch package is the `*_rootless.deb` release from:
+
+```text
+https://github.com/epic0001/zxtouchrootless/releases/download/v1.0.0/com.zjx.ioscontrol_1.0.0_rootless.deb
+```
+
+The agent uses its local socket on port `6000`; the Web Server toggle is not required. For
+a laptop-side test, set `phone.frida_host` and `phone.zxtouch_host` to `127.0.0.1`, set
+`phone.zxtouch_template_dir` to `/var/mobile/Downloads`, and copy the template:
+
+```bash
+scp phone-agent/calibration/email_login.png mobile@<phone-ip>:/var/mobile/Downloads/email_login.png
+```
+
+The first smoke test should be a ZXTouch screenshot, not a scheduled run:
+
+```bash
+python3 - <<'PY'
+from iphone.transport import ZXTouchClient
+
+t = ZXTouchClient("127.0.0.1")
+jpg = t.screenshot()
+assert jpg.startswith(b"\\xff\\xd8\\xff")
+print(f"ZXTouch screenshot OK ({len(jpg)} bytes)")
+PY
+```
+
+Do not proceed to calibration until this check succeeds. The agent waits for the loading
+screen template and taps the matched location, rather than relying on a fixed sleep.
+
 ## 3. Manual one-off bubble (ad-hoc)
 
 Use the web app "Run now" against the account — it enqueues a `run` job, the open long-poll

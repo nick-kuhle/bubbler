@@ -35,10 +35,13 @@ export default function Landing() {
 
   return (
     <section className="card" style={{ maxWidth: 420, margin: "4rem auto" }}>
-      <h1>bubbler</h1>
+      <h1>LOL automatic bubble scheduler</h1>
+      <p className="tagline">
+        Alliance LOL — we don&apos;t take things seriously, we just keep the bubbles up.
+      </p>
       <p className="muted">
-        Hands-off Evony peace-shield keeper for our circle. Your email signs you in — the
-        same one you use in the game, so there are no extra passwords to manage.
+        Overlapping 3-day truces on schedule (2,500 gems each). Your email signs you in —
+        the same one you use in the game, so there are no extra passwords to manage.
       </p>
       <form onSubmit={submit}>
         <label>
@@ -56,7 +59,7 @@ export default function Landing() {
         </label>
         {error && <p className="warn" role="alert">{error}</p>}
         <button type="submit" disabled={busy} style={{ marginTop: "0.9rem" }}>
-          {busy ? "sending link…" : "send me a magic link"}
+          {busy ? "signing in…" : "sign in"}
         </button>
       </form>
     </section>

@@ -2,14 +2,15 @@
 
 ## Game mechanics we rely on
 
-- **Bubble = Truce Agreement** item. We use the **3-day** variant at **7500 gems** (operator-confirmed).
+- **Bubble = Truce Agreement** item. We use the **3-day** variant at **2500 gems** (operator-confirmed).
 - You **cannot activate a truce while an enemy army is actively attacking** your keep.
   Therefore we do **not** react to attacks — we keep an always-on shield topped up on
   schedule. (A shield with >24h remaining cancels most risk; the scheduler skips re-applying
   in that case.)
-- **Login is email + one-time 6-digit code.** The email-login button exists **only in the
-  mobile app**. The code arrives by email and the code-entry screen shows a **~90-second
-  countdown**.
+- **Login is email + one-time 6-digit code.** The email-login control is the small **gold
+  person icon in the top-left of the loading/connecting screen** (iPhone XR screenshot
+  pixels ≈ 50,248). It is only tappable while the game is loading and may need repeated
+  taps. After it lands, Evony shows **Switch Account** → email → 6-digit code (~90s).
 - Sessions persist on the device. A same-device re-login needs only the email typed (no code).
 - **"Clear Other Devices"** in Evony settings revokes the device session → next run must
   re-link with a **fresh 6-digit code** (surfaced via the web-app re-link flow).
@@ -29,7 +30,7 @@ claim job (from long-poll event)
   ├─ state check: "on the post-login world view?"
   │     ├─ no, code prompt shown → abort as needs_code (surface re-link)
   │     └─ no, not logged in → type email (fetched from the event payload); if code prompt appears → abort as needs_code
-  ├─ navigate: open shield/bubble item → select 3-day Truce (7500💎) → Activate → Confirm
+  ├─ navigate: open shield/bubble item → select 3-day Truce (2500💎) → Activate → Confirm
   ├─ verify: screenshot → shield indicator present AND countdown readout ≥ 3 days − ε
   ├─ close Evony (back to home screen)
   │
@@ -94,8 +95,8 @@ factor if the phone reports a different resolution.
 | Account switched to another device | Same as above (session revoked) |
 | Code expired mid-link | Phone taps **resend**; wizard prompts again; fresh 90s |
 | App update / new Evony UI version | Templates stale → run fails with mismatch; re-run calibration |
-| Hermes Touch down | Agent restart; escalate to SSH-level recovery in runbook |
-| Screen off / phone asleep | Wake via Hermes Touch (or `launch`); the device is set not to auto-lock |
+| Frida down | Agent restart; verify frida-server and the Python binding over SSH |
+| Screen off / phone asleep | Wake the phone physically or with an installed jailbreak utility; the device is set not to auto-lock |
 
 ## Timing & load
 

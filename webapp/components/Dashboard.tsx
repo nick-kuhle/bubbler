@@ -67,6 +67,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
   const [slots, setSlots] = useState<EditSlot[]>([]);
   const [gemAck, setGemAck] = useState(true);
   const [edit, setEdit] = useState<{ busy: boolean; msg: string | null; error: boolean }>({ busy: false, msg: null, error: false });
+  const [profile, setProfile] = useState({ email: "", name: "", busy: false, msg: null as string | null, error: false });
   const [run, setRun] = useState<{ busy: boolean; msg: "queued" | "error" | null }>({ busy: false, msg: null });
   const [nowTs, setNowTs] = useState(() => Date.now());
 
@@ -84,6 +85,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         setSlots(me.slots.map(slotFromMe));
         setGemAck(me.slots.every((s) => s.gem_ack === 1));
       }
+      setProfile((p) => ({ ...p, email: me.user.email, name: me.user.evony_name }));
       setLoad({ kind: "ready", me });
     } catch {
       setLoad({ kind: "error" });
@@ -168,6 +170,29 @@ export default function Dashboard({ dict }: { dict: Dict }) {
     await save();
   }
 
+  async function saveProfile() {
+    setProfile((p) => ({ ...p, busy: true, msg: null, error: false }));
+    try {
+      const r = await fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: profile.email, evony_name: profile.name }),
+      });
+      if (r.status === 409) {
+        setProfile((p) => ({ ...p, busy: false, msg: d.profileEmailTaken, error: true }));
+        return;
+      }
+      if (!r.ok) {
+        setProfile((p) => ({ ...p, busy: false, msg: d.profileError, error: true }));
+        return;
+      }
+      setProfile((p) => ({ ...p, busy: false, msg: d.profileSaved, error: false }));
+      window.setTimeout(() => void refresh(), 300);
+    } catch {
+      setProfile((p) => ({ ...p, busy: false, msg: d.profileError, error: true }));
+    }
+  }
+
   async function runNow() {
     setRun({ busy: true, msg: null });
     try {
@@ -221,10 +246,38 @@ export default function Dashboard({ dict }: { dict: Dict }) {
           </div>
           <div style={{ textAlign: "right" }}>
             <span className="badge">{roleBadge}</span>
-            <p className="muted" style={{ margin: "0.25rem 0 0" }}>{d.emailLabel}: {me.user.email}</p>
-            {me.user.evony_name && <p className="muted" style={{ margin: 0 }}>{me.user.evony_name}</p>}
+            {me.user.evony_name && <p className="muted" style={{ margin: "0.25rem 0 0" }}>{me.user.evony_name}</p>}
           </div>
         </div>
+      </section>
+
+      <section className="card">
+        <h3>{d.profileTitle}</h3>
+        <p className="muted">{d.profileBody}</p>
+        <label className="field">
+          <span>{d.emailLabel}</span>
+          <input
+            type="email"
+            value={profile.email}
+            onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
+            style={{ width: "100%" }}
+          />
+        </label>
+        <label className="field">
+          <span>{d.nameLabel}</span>
+          <input
+            type="text"
+            value={profile.name}
+            onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
+            style={{ width: "100%" }}
+          />
+        </label>
+        {profile.msg && (
+          <p className={profile.error ? "warn" : "ok"} role={profile.error ? "alert" : "status"}>{profile.msg}</p>
+        )}
+        <button type="button" onClick={() => void saveProfile()} disabled={profile.busy}>
+          {profile.busy ? d.profileSaving : d.profileSave}
+        </button>
       </section>
 
       <section className="card">

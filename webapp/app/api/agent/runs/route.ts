@@ -26,13 +26,19 @@ export async function POST(req: NextRequest) {
 
   const runId = nid();
   const d = db();
+  // Attribute the run to the job's member; fall back to the agent's session user.
+  let runUserId = agent.id;
+  if (body.job_id) {
+    const job = await d.get("SELECT user_id FROM jobs WHERE id = ?", [String(body.job_id)]);
+    if (job) runUserId = String(job.user_id);
+  }
   await d.run(
     `INSERT INTO runs (id, job_id, user_id, trigger, status, shield_hours_remaining, evidence_ref, error, duration_ms, created_at)
      VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?)`,
     [
       runId,
       String(body.job_id || ""),
-      agent.id,
+      runUserId,
       String(body.trigger || "schedule"),
       String(body.status || "applied"),
       body.shield_hours_remaining ?? null,

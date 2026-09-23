@@ -16,14 +16,43 @@ real user (docs: "force-close app after every run").
 from __future__ import annotations
 
 import logging
+import json
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 log = logging.getLogger("bubbler.evony")
 
 
 class CalibrationMissing(RuntimeError):
     pass
+
+
+def load_calibration(path: str) -> "Calibration":
+    """Load the device calibration manifest without requiring PyYAML on iOS.
+
+    The manifest is JSON so the on-device agent only needs Python's standard library;
+    screenshot templates remain beside it in the same calibration directory.
+    """
+    manifest = Path(path)
+    try:
+        raw = json.loads(manifest.read_text())
+    except FileNotFoundError as exc:
+        raise CalibrationMissing(f"calibration manifest missing: {manifest}") from exc
+    except json.JSONDecodeError as exc:
+        raise CalibrationMissing(f"invalid calibration manifest: {manifest}") from exc
+
+    if not isinstance(raw, dict):
+        raise CalibrationMissing("calibration manifest must be an object")
+    screens = raw.get("screens")
+    if not isinstance(screens, dict) or not screens:
+        raise CalibrationMissing("calibration manifest has no screens")
+    roi = raw.get("shield_countdown_roi")
+    if roi is not None:
+        if not isinstance(roi, list) or len(roi) != 4 or not all(isinstance(v, int) for v in roi):
+            raise CalibrationMissing("shield_countdown_roi must be four integers")
+        roi = tuple(roi)
+    return Calibration(screens=screens, shield_countdown_roi=roi)
 
 
 @dataclass
@@ -62,12 +91,28 @@ class EvonyController:
         point = self.cal.screens[screen].get("taps", {}).get(tap)
         if not point:
             raise CalibrationMissing(f"no tap '{tap}' for screen '{screen}'")
-        self.t.tap(point["x"], point["y"])
+        self.t.tap(int(point["x"]), int(point["y"]))
+
+    def tap_pair(self, screen: str, tap: str = "primary") -> None:
+        """Tap a calibrated pixel point and its @2x UIKit-point twin.
+
+        Screenshots are 828x1792; ZXTouch may want pixels or points. Hitting both
+        is harmless on this loading/login UI and covers either coordinate space.
+        """
+        if not self.cal or screen not in self.cal.screens:
+            raise CalibrationMissing(f"no calibration for screen '{screen}'")
+        point = self.cal.screens[screen].get("taps", {}).get(tap)
+        if not point:
+            raise CalibrationMissing(f"no tap '{tap}' for screen '{screen}'")
+        x, y = int(point["x"]), int(point["y"])
+        self.t.tap(x, y)
+        time.sleep(0.05)
+        self.t.tap(max(1, x // 2), max(1, y // 2))
 
     # -- run flow ------------------------------------------------------
-    def open_evony(self, bundle_id: str) -> None:
+    def open_evony(self, bundle_id: str, settle: float = 0.25) -> None:
         self.t.launch(bundle_id)
-        time.sleep(6)  # cold launch; swap for wait-for-world-view guard when calibrated
+        time.sleep(settle)
 
     def to_world_view(self, email: str) -> str:
         """Return 'world' if we reach the world view, or 'needs_code' if stuck at a code
@@ -77,9 +122,9 @@ class EvonyController:
         if self.on_screen("code_dialog"):
             return "needs_code"
         if self.on_screen("email_login"):
-            self.tap("email_login", "email")
+            self.tap_pair("email_login", "email")
             self.t.type_text(email)
-            self.tap("email_login", "continue")
+            self.tap_pair("email_login", "continue")
             time.sleep(2)
             return "needs_code" if self.on_screen("code_dialog") else "world"
         return "failed"
@@ -92,7 +137,7 @@ class EvonyController:
         try:
             self.tap("world_view", "bubble_menu")
             time.sleep(1)
-            self.tap("truce_3day", "select")     # 3-day Truce, 7500 gems
+            self.tap("truce_3day", "select")
             time.sleep(1)
             self.tap("activate_confirm", "activate")
             time.sleep(1)
@@ -124,32 +169,46 @@ class EvonyController:
         return None  # no vision -> can't confirm remaining; status-only
 
     def force_close_evony(self, bundle_id: str) -> None:
-        """Harden the close path: emit a HID cancel, then killall -9 the Evony process."""
+        """Harden the close path, then terminate the Evony process."""
         self.t.force_close(bundle_id)
 
     # -- link flow -----------------------------------------------------
-    def link_login(self, email: str, get_code, report_expired):
+    def link_login(self, email: str, get_code, report_expired, on_waiting_code=None):
         """Drive the interactive link. `get_code` blocks until the orchestrator delivers the
         submitted 6-digit code (long-poll). Returns result dict (linked/failed/expired)."""
         try:
             self.launch_login_screen()
+            time.sleep(0.5)
+            self.tap_pair("email_login", "email")
+            time.sleep(0.5)
             self.t.type_text(email)
-            self.tap("email_login", "continue")  # triggers Evony to email the code
-        except CalibrationMissing as exc:
-            return {"status": "failed", "error": f"calibration: {exc}"}
+            time.sleep(0.4)
+            self.tap_pair("email_login", "continue")
+            if on_waiting_code:
+                on_waiting_code()
+        except CalibrationMissing as extra:
+            return {"status": "failed", "error": f"calibration: {extra}"}
 
         attempts = 0
         while True:
             code = get_code()                       # delivered ≈1s after user submits
             if code is None:
                 return {"status": "expired", "error": "code entry window expired"}
+            try:
+                self.tap_pair("code_dialog", "code")
+                time.sleep(0.4)
+            except CalibrationMissing:
+                pass
             self.t.type_text(code)
             try:
-                self.tap("code_dialog", "confirm")
-            except CalibrationMissing as exc:
-                return {"status": "failed", "error": f"calibration: {exc}"}
-            time.sleep(3)
+                self.tap_pair("code_dialog", "confirm")
+            except CalibrationMissing as extra:
+                return {"status": "failed", "error": f"calibration: {extra}"}
+            time.sleep(4)
             if self.on_screen("world_view"):
+                return {"status": "linked"}
+            if self.v is None:
+                # no-verify mode: code was typed; operator confirms on the phone
                 return {"status": "linked"}
             attempts += 1
             if attempts >= 3:
@@ -157,9 +216,39 @@ class EvonyController:
             report_expired()                        # tell the wizard: ask the user again
             self.tap_resend()
 
+    def _account_icon_points(self) -> list[tuple[int, int]]:
+        """Top-left account icon: screenshot pixels plus @2x points, with jitter."""
+        spec = (self.cal.screens.get("email_login") or {}) if self.cal else {}
+        raw = (spec.get("taps") or {}).get("email_button") or {"x": 50, "y": 248}
+        x, y = int(raw["x"]), int(raw["y"])
+        px = [(x, y), (x - 16, y), (x + 16, y), (x, y - 18), (x, y + 18), (x + 12, y + 12)]
+        pts = [(max(1, a // 2), max(1, b // 2)) for a, b in px]
+        return [(a, b) for a, b in px + pts if a > 0 and b > 0]
+
     def launch_login_screen(self) -> None:
-        # Navigate from launch to the email-login entry (calibration-dependent).
-        self.tap("email_login", "email_button")
+        """Hammer the top-left account icon for the whole loading screen.
+
+        The gold person button is only tappable while Evony is loading/connecting.
+        It is small and flaky — tap a cluster around it, repeatedly, in both
+        pixel and point space, until the Switch Account dialog can appear.
+        """
+        if not self.cal or "email_login" not in self.cal.screens:
+            raise CalibrationMissing("no calibration for screen 'email_login'")
+        spec = self.cal.screens["email_login"]
+        template = spec.get("template")
+        try_tap = getattr(self.t, "try_tap_template", None)
+        points = self._account_icon_points()
+        deadline = time.monotonic() + 22
+        i = 0
+        while time.monotonic() < deadline:
+            if template and try_tap and try_tap(template):
+                time.sleep(0.5)
+                return
+            x, y = points[i % len(points)]
+            self.t.tap(x, y)
+            i += 1
+            time.sleep(0.1)
+        time.sleep(0.3)
 
     def tap_resend(self) -> None:
         try:

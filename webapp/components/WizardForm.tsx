@@ -250,7 +250,6 @@ export default function WizardForm({ dict }: Props) {
             <span>{w.accountLabel}</span>
             <input
               type="text"
-              inputMode="numeric"
               autoFocus
               value={account}
               placeholder={w.accountPlaceholder}

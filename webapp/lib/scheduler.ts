@@ -66,12 +66,16 @@ export async function claimNext(): Promise<BubblerEvent | null> {
   )) as (Row & { job_id: string; kind: "run" | "link" | "code"; user_id: string; email: string; evony_name: string; payload: string }) | undefined;
   if (!row) return null;
   await d.run("UPDATE jobs SET status = 'claimed' WHERE id = ?", [row.job_id]);
+  const payload = JSON.parse(row.payload || "{}") as Record<string, unknown>;
+  if (row.kind === "code") {
+    await d.run("UPDATE jobs SET payload = '{}' WHERE id = ?", [row.job_id]);
+  }
   return {
     job_id: row.job_id,
     kind: row.kind,
     user_id: row.user_id,
     email: row.email,
     evony_name: row.evony_name,
-    payload: JSON.parse(row.payload || "{}") as Record<string, unknown>,
+    payload,
   };
 }

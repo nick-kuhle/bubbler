@@ -1,8 +1,8 @@
 // app/api/me/route.ts — the member dashboard's single source of truth: profile, active
 // slots (one row per day+time), next scheduled run (computed in UTC = Evony server time),
 // and last run result.
-import { NextResponse } from "next/server";
-import { requireLogin } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { currentUser, unauthorized } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -39,7 +39,8 @@ function nextSlot(slots: SlotLite[], now: Date = new Date()): SlotLite | null {
 }
 
 export async function GET() {
-  const user = await requireLogin();
+  const user = await currentUser();
+  if (!user) return unauthorized();
   const d = db();
 
   const slots = (await d.all(
@@ -76,5 +77,24 @@ export async function GET() {
           created_at: lastRun.created_at,
         }
       : null,
+  });
+}
+
+export async function PATCH(req: NextRequest) {
+  const user = await currentUser();
+  if (!user) return unauthorized();
+  const body = (await req.json().catch(() => ({}))) as { email?: string; evony_name?: string };
+  const email = String(body.email ?? user.email).trim().toLowerCase();
+  const name = String(body.evony_name ?? user.evony_name).trim();
+  if (!email.includes("@")) return NextResponse.json({ error: "bad-email" }, { status: 400 });
+  if (!name) return NextResponse.json({ error: "bad-name" }, { status: 400 });
+
+  const d = db();
+  const taken = await d.get("SELECT id FROM users WHERE email = ? AND id != ?", [email, user.id]);
+  if (taken) return NextResponse.json({ error: "email-taken" }, { status: 409 });
+  await d.run("UPDATE users SET email = ?, evony_name = ? WHERE id = ?", [email, name, user.id]);
+  return NextResponse.json({
+    ok: true,
+    user: { id: user.id, email, evony_name: name, is_operator: user.is_operator },
   });
 }

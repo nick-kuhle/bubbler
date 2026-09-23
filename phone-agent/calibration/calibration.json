@@ -1,0 +1,20 @@
+{
+  "screen": {"width": 828, "height": 1792, "scale": 2},
+  "screens": {
+    "email_login": {
+      "template": "email_login.png",
+      "taps": {
+        "email_button": {"x": 50, "y": 248},
+        "email": {"x": 414, "y": 830},
+        "continue": {"x": 579, "y": 1100}
+      }
+    },
+    "code_dialog": {
+      "taps": {
+        "code": {"x": 414, "y": 830},
+        "confirm": {"x": 579, "y": 1100},
+        "resend": {"x": 414, "y": 1220}
+      }
+    }
+  }
+}

@@ -5,7 +5,7 @@
 Let an operator (the account owner) and their trusted circle keep Evony peace shields
 ("bubbles") up on a fixed schedule without ever opening the game manually. Members link
 their Evony account once, pick Mon/Wed/Fri-style schedules, and the system applies the
-**3-day Truce Agreement (7500 gems)** for each account and verifies it before closing the game.
+**3-day Truce Agreement (2500 gems)** for each account and verifies it before closing the game.
 
 ## Users & roles
 
@@ -40,7 +40,7 @@ and the 90-second code window is made retry-safe.
      fresh code + fresh 90s, and the wizard shows *"The code expired — a new one was just
      sent to your email."* Nothing about the 90s window is a hard deadline.
 4. **Schedule + gem acknowledgment** — pick weekdays/time (default Mon/Wed/Fri) and check a
-   box acknowledging the 7500-gem cost.
+    box acknowledging the 2500-gem cost.
 5. **Confirm** — on success, creates the user + schedule and marks the link complete.
 
 Privacy copy on the app (wizard + footer), verbatim:
