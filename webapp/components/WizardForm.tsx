@@ -260,17 +260,6 @@ export default function WizardForm({ dict }: Props) {
         </form>
       )}
 
-      {step === 2 && (
-        <div>
-          <h3>{w.step2Title}</h3>
-          <p className="wizard-status">
-            <span className="spin" aria-hidden />
-            {w.step2Waiting}
-          </p>
-          <p className="muted" style={{ marginTop: "0.6rem" }}>{w.step2Body}</p>
-        </div>
-      )}
-
       {step === 3 && (
         <form onSubmit={(e) => void submitCode(e)}>
           <h3>{w.step3Title}</h3>
