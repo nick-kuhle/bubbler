@@ -306,8 +306,11 @@ class EvonyController:
         return False
 
     def _enter_email(self, email: str) -> None:
-        log.info("tap email field once")
-        self.t.tap(414, 830)
+        log.info("tap email field")
+        for n in range(1, 4):
+            log.info("email field tap #%s", n)
+            self.t.tap(414, 830)
+            time.sleep(0.4)
         time.sleep(2.2)
         self.t.type_text(email)
         time.sleep(1.6)
@@ -354,14 +357,16 @@ class EvonyController:
         log.info("login icon taps (px): %s", points)
         if bundle_id:
             self.t.launch(bundle_id)
+        log.info("waiting 1s after opening evony before login icon taps")
+        time.sleep(1.0)
         start = time.monotonic()
         x, y = points[0]
-        for n in range(1, 11):
+        for n in range(1, 16):
             log.info("login icon tap %s,%s #%s (+%.0fms)", x, y, n, (time.monotonic() - start) * 1000)
             try:
                 self.t.tap(x, y)
-            except Exception as exc:
-                log.warning("login tap failed: %s", exc)
+            except Exception as extra:
+                log.warning("login tap failed: %s", extra)
             time.sleep(0.4)
         if self._dialog_visible():
             return True
