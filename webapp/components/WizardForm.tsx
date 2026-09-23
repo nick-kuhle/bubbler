@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "@/src/i18n/navigation";
 import { Link, type Dict } from "@/lib/i18n";
+import UnlinkButton from "@/components/UnlinkButton";
 import SlotsEditor, {
   DEFAULT_SLOTS,
   EditSlot,
@@ -206,7 +207,7 @@ export default function WizardForm({ dict }: Props) {
         <p className="muted">{w.alreadyBody}</p>
         <div className="row" style={{ justifyContent: "center", marginTop: "1rem" }}>
           <Link className="btn" href="/dashboard">{w.goDashboard}</Link>
-          <button onClick={() => setAlready(false)}>{w.linkAgain}</button>
+          <UnlinkButton dict={dict} onUnlinked={() => setAlready(false)} />
         </div>
       </section>
     );

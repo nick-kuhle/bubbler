@@ -1,5 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 
+import UnlinkButton from "@/components/UnlinkButton";
 import WizardForm from "@/components/WizardForm";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -45,7 +46,7 @@ export default async function WizardPage({
           <p className="muted">{w.alreadyBody}</p>
           <div className="row" style={{ justifyContent: "center", marginTop: "1rem" }}>
             <Link className="btn" href="/dashboard">{w.goDashboard}</Link>
-            <Link className="btn" href="/wizard?again=1">{w.linkAgain}</Link>
+            <UnlinkButton dict={dict} />
           </div>
         </section>
       );

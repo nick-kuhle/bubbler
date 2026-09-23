@@ -342,6 +342,7 @@ def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyCont
             bundle_id=bundle_id,
         )
     finally:
+        time.sleep(8)
         evony.force_close_evony(bundle_id)
         _link_lock.release()
     cloud.report_link(link_id, result)

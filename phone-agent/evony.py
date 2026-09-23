@@ -197,9 +197,10 @@ class EvonyController:
                 return {"status": "expired", "error": "code entry window expired"}
             try:
                 self._enter_code(code)
+                self._confirm_load_account()
             except CalibrationMissing as extra:
                 return {"status": "failed", "error": f"calibration: {extra}"}
-            time.sleep(6)
+            time.sleep(28)
             if self.on_screen("world_view"):
                 return {"status": "linked"}
             if self._code_dialog_visible():
@@ -209,6 +210,12 @@ class EvonyController:
                 report_expired()
                 self.tap_resend()
                 continue
+            if self._dialog_visible():
+                log.info("load-account dialog still up; tapping confirm again")
+                self._confirm_load_account()
+                time.sleep(20)
+                if self._dialog_visible() or self._code_dialog_visible():
+                    return {"status": "failed", "error": "load-account confirm did not complete"}
             return {"status": "linked"}
 
     def _login_icon_point(self) -> tuple[int, int]:
@@ -360,6 +367,13 @@ class EvonyController:
         confirm_x, confirm_y = self._code_tap("confirm", (580, 1082))
         log.info("tap code confirm %s,%s", confirm_x, confirm_y)
         self.t.tap(confirm_x, confirm_y)
+
+    def _confirm_load_account(self) -> None:
+        x, y = self._code_tap("load_confirm", (579, 1100))
+        log.info("waiting for load-account dialog")
+        time.sleep(2.4)
+        log.info("tap load-account confirm %s,%s", x, y)
+        self.t.tap(x, y)
 
     def _dialog_visible(self) -> bool:
         img = self._grab()

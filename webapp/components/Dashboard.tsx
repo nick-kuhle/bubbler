@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, type Dict } from "@/lib/i18n";
+import UnlinkButton from "@/components/UnlinkButton";
 import { GEMS_72H } from "@/lib/i18n";
 import SlotsEditor, {
   EditSlot,
@@ -277,6 +278,9 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         <button type="button" onClick={() => void saveProfile()} disabled={profile.busy}>
           {profile.busy ? d.profileSaving : d.profileSave}
         </button>
+        <div style={{ marginTop: "0.8rem" }}>
+          <UnlinkButton dict={dict} onUnlinked={() => void refresh()} />
+        </div>
       </section>
 
       <section className="card">
