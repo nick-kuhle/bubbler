@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import json
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -91,16 +92,8 @@ class EvonyController:
         return self.v.find_template(screen, template) is not None
 
     def device_xy(self, x: int, y: int) -> tuple[int, int]:
-        cal_w, cal_h = (self.cal.screen_size if self.cal else (828, 1792))
-        if self._device_size is None:
-            try:
-                self._device_size = self.t.screen_size()
-                log.info("ZXTouch screen size %s", self._device_size)
-            except Exception as exc:
-                self._device_size = (414, 896)
-                log.warning("ZXTouch screen size failed (%s); using points %s", exc, self._device_size)
-        dw, dh = self._device_size
-        return max(1, int(round(x * dw / cal_w))), max(1, int(round(y * dh / cal_h)))
+        # ZXTouch screenshots are 828x1792 — same as iOS screenshots. Do not scale.
+        return int(x), int(y)
 
     def tap(self, screen: str, tap: str = "primary") -> None:
         if not self.cal or screen not in self.cal.screens:
@@ -178,12 +171,12 @@ class EvonyController:
         self.t.force_close(bundle_id)
 
     # -- link flow -----------------------------------------------------
-    def link_login(self, email: str, get_code, report_expired, on_waiting_code=None):
+    def link_login(self, email: str, get_code, report_expired, on_waiting_code=None, bundle_id: str | None = None):
         """Drive the interactive link. `get_code` blocks until the orchestrator delivers the
         submitted 6-digit code (long-poll). Returns result dict (linked/failed/expired)."""
         try:
-            self.launch_login_screen()
-            time.sleep(0.8)
+            self.launch_login_screen(bundle_id)
+            time.sleep(0.6)
             self.tap_pair("email_login", "email")
             time.sleep(0.5)
             self.t.type_text(email)
@@ -222,27 +215,43 @@ class EvonyController:
             self.tap_resend()
 
     def _account_icon_points(self) -> list[tuple[int, int]]:
-        """Gold person icon on the loading screen (screenshot pixels → device coords)."""
+        """Gold person icon — ZXTouch/iOS screenshot pixels (828x1792)."""
         spec = (self.cal.screens.get("email_login") or {}) if self.cal else {}
         raw = (spec.get("taps") or {}).get("email_button") or {"x": 50, "y": 248}
-        x, y = self.device_xy(int(raw["x"]), int(raw["y"]))
-        jitter = [(0, 0), (-8, 0), (8, 0), (0, -10), (0, 10), (6, 8), (-6, 8)]
-        return [(max(1, x + dx), max(1, y + dy)) for dx, dy in jitter]
+        x, y = int(raw["x"]), int(raw["y"])
+        return [
+            (x, y), (56, 250), (44, 236), (62, 258), (38, 228),
+            (70, 252), (50, 220), (48, 268), (32, 240), (80, 248),
+        ]
 
-    def launch_login_screen(self) -> None:
-        """Hammer the top-left account icon for the whole loading screen."""
+    def launch_login_screen(self, bundle_id: str | None = None) -> None:
+        """Kill Evony, reopen it, and tap the account icon for the whole splash."""
         if not self.cal or "email_login" not in self.cal.screens:
             raise CalibrationMissing("no calibration for screen 'email_login'")
         points = self._account_icon_points()
-        log.info("login icon taps (device xy): %s", points)
-        deadline = time.monotonic() + 25
-        i = 0
-        while time.monotonic() < deadline:
-            x, y = points[i % len(points)]
-            self.t.tap(x, y)
-            i += 1
-            time.sleep(0.08)
-        time.sleep(0.3)
+        log.info("login icon taps (px): %s", points)
+        stop = threading.Event()
+
+        def hammer():
+            i = 0
+            while not stop.is_set():
+                x, y = points[i % len(points)]
+                try:
+                    self.t.tap(x, y)
+                except Exception as exc:
+                    log.warning("login tap failed: %s", exc)
+                i += 1
+                time.sleep(0.06)
+
+        th = threading.Thread(target=hammer, daemon=True)
+        th.start()
+        try:
+            if bundle_id:
+                self.t.launch(bundle_id)
+            time.sleep(18)
+        finally:
+            stop.set()
+            th.join(timeout=1)
 
     def tap_resend(self) -> None:
         try:

@@ -70,7 +70,7 @@ class ZXTouchClient:
         down = f"11{0:02d}{x10:05d}{y10:05d}"
         up = f"10{0:02d}{x10:05d}{y10:05d}"
         self._send(self.TOUCH, down)
-        time.sleep(0.05)
+        time.sleep(0.12)
         self._send(self.TOUCH, up)
 
     def screen_size(self) -> tuple[int, int]:
@@ -178,8 +178,11 @@ class FridaTouch:
             raise FridaDown(f"Frida {method} failed: {exc}") from exc
 
     def tap(self, x: int, y: int) -> None:
-        log.debug("tap %s,%s", x, y)
+        log.info("tap %s,%s", x, y)
         self._touch.tap(int(x), int(y))
+
+    def screen_size(self) -> tuple[int, int]:
+        return 828, 1792
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int) -> None:
         self._touch._send(self._touch.TOUCH, f"12{5:02d}{int(x1 * 10):05d}{int(y1 * 10):05d}")
@@ -197,14 +200,16 @@ class FridaTouch:
         self._touch.type_text(str(text))
 
     def launch(self, bundle_id: str) -> None:
-        """Force-close and foreground the app through ZXTouch (Frida optional)."""
+        """Force-kill Evony on the phone, then cold-start it."""
         if bundle_id != self.bundle_id:
             raise FridaDown(f"transport configured for {self.bundle_id}, not {bundle_id}")
-        close_app(bundle_id)
         try:
+            self._ensure_device()
             self._kill_remote_processes()
-        except FridaDown:
-            pass
+        except FridaDown as exc:
+            log.warning("frida kill skipped: %s", exc)
+        close_app(bundle_id)
+        time.sleep(1.2)
         try:
             self._touch.switch_to_app(bundle_id)
         except FridaDown:
@@ -213,7 +218,6 @@ class FridaTouch:
                 self._device.resume(pid)
             except Exception as exc:
                 raise FridaDown(f"could not launch {bundle_id}: {exc}") from exc
-        time.sleep(0.5)
 
     def wait_for_template(self, template_name: str, timeout: float = 30) -> bool:
         if not self._touch_template_dir:
@@ -299,11 +303,20 @@ class FridaTouch:
 
 
 def close_app(bundle_id: str) -> None:
-    """Terminate the app from the jailbroken phone's local shell."""
+    """Kill Evony on this device, or over SSH when the agent runs on a laptop."""
     leaf = bundle_id.rsplit(".", 1)[-1]
-    for name in (bundle_id, leaf, leaf.capitalize()):
+    names = [bundle_id, leaf, leaf.capitalize(), "Evony"]
+    for name in names:
         subprocess.run(["killall", "-9", name], capture_output=True, check=False)
-    time.sleep(1)
+    key = Path("/tmp/opencode/bubbler_phone_ed25519")
+    if key.exists():
+        remote = " ; ".join(f"killall -9 {n}" for n in names)
+        subprocess.run(
+            ["ssh", "-i", str(key), "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
+             "mobile@192.168.1.166", remote],
+            capture_output=True, check=False,
+        )
+    time.sleep(0.8)
 
 
 def wake_screen(command: str = "wake") -> None:
