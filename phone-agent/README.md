@@ -1,55 +1,56 @@
-# On-device agent (Python) — runs on the jailbroken iPhone
+# Python agent — target runtime: jailbroken iPhone
 
-The agent replaces the old N150 home driver. It runs **on the phone itself** as a
-LaunchDaemon, talks to Vercel over HTTPS (outbound only, long-poll), and drives the Evony
-app through a local Frida bridge. There is no host computer in the target standalone layout.
+The Evony email/code link flow has worked with **new users and different email addresses**
+in the operator's current setup. That test does not establish that the phone is already
+running the agent independently. The target is a LaunchDaemon on the iPhone making only
+outbound HTTPS long-polls to Vercel over WiFi. See the
+[cutover playbook](../docs/07-cutover.md) before retiring the local machine.
 
 ## Layout
 
 ```
-phone-agent/
-  agent.py              # long-poll loop: GET /api/agent/events -> dispatch -> report
-  evony.py              # run flow (bubble) + link flow (code, resend)
-  vision.py             # OpenCV template match + OCR (on-device)
-  iphone/transport.py   # on-device control surface: Frida session on 127.0.0.1:27042
-  config.example.yaml   # config template (NO secrets)
-  requirements.txt      # python deps
-  bootstrap/            # LaunchDaemon plist + install script
-  calibration/          # reference screenshots + ROI maps (populated in calibrate phase)
+agent.py             GET /api/agent/events long-poll, dispatch and report
+evony.py             in-game link + bubble orchestration
+vision.py            template/OCR helpers (requires device calibration)
+iphone/transport.py  ZXTouch + Frida support; currently has laptop-test SSH fallback
+config.example.yaml  config template (no secrets)
+bootstrap/           LaunchDaemon plist + installer (needs staging-order fix)
+calibration/         JSON tap/ROI manifest; real image templates are git-ignored
 ```
 
-## Quick start (dev on your laptop first)
+## On-device prerequisites (not yet verified by this review)
 
-Agent and Evony orchestration can be developed/tested off-device:
+- Procursus Python, `requests`, `Pillow`, a working **iOS arm64e** Python `frida`
+  binding matching frida-server, and rootless ZXTouch. Installing a generic laptop
+  Python/Frida wheel on iOS is not sufficient. Check versions/imports on the phone.
+- `frida-server` on `127.0.0.1:27042`, ZXTouch locally reachable on port `6000`, and
+  working screenshots/taps. Verify their actual listening interfaces and startup after
+  respring. Game launch and process close must work *on device*, not through the existing
+  laptop-key/LAN fallback in `iphone/transport.py` (to be removed during cutover).
+- Device-specific `calibration.json` and image templates securely transferred to the
+  installed calibration directory. Images are absent from Git by design. The manifest
+  currently covers link-related taps, not a verified 3-day truce run. Do not switch on
+  unattended bubble schedules before calibrating and testing verification.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp config.example.yaml config.yaml   # fill in the real Vercel URL + bearer token
-python agent.py --once               # opens one long-poll round and exits
-```
+## Installation target and config
 
-`iphone/frida_agent.bundle.js` is injected into Evony by the local `frida-server`. The Python agent
-uses the `frida` binding and does not require Hermes Touch. `vision.py` imports
-cv2/pytesseract lazily so the loop can run in "no-verify" mode.
+The reviewed GitHub source can be cloned to `/var/mobile/bubbler` (repo is currently
+public; no PAT required). Run the installer *on the phone* from the checkout root in a
+root shell once its ordering is fixed: `phone-agent/bootstrap/install.sh` copies the
+**contents** of this folder to `/var/jb/usr/libexec/bubbler/`, installs the plist at
+`/var/jb/Library/LaunchDaemons/com.bubbler.agent.plist`, and currently **loads the daemon
+immediately**. Stage dependencies and the real config before starting it; the cutover
+playbook treats this as an explicit code-change gate.
 
-## Deploy to the phone
+`config.yaml` belongs **only** in the installed agent directory, with mode 0600 and the
+correct Vercel HTTPS URL + `cloud.agent_token`. The template is `config.example.yaml`;
+never commit credentials or copy them into a PR. Frida/ZXTouch hosts should both be
+`127.0.0.1` in the final phone layout. Runs are driven by cloud `slots`, not the example
+`config.yaml` schedule entries; the phone responds to delivered events. The agent's
+`--once` option performs one poll and exits; use it only when the daemon is stopped and
+no jobs are pending, or it may claim a real job.
 
-Follow `../docs/06-runbook.md` §2 (scp to `/var/jb/usr/libexec/bubbler/`, toggle the
-LaunchDaemon). The LaunchDaemon plist is in `bootstrap/`.
-
-**No secrets in the repo** — `config.yaml` is git-ignored; commit only
-`config.example.yaml`.
-
-## Config keys
-
-See `config.example.yaml`. The phone needs the Vercel base URL (`cloud.base_url`), the
-bearer token (`cloud.agent_token`), and a local `frida-server`. Runs are driven entirely by
-the cloud's per-slot scheduler (each `schedule.slots` row its own `weekday`/`time`, UTC),
-so the agent holds the long-poll and executes whatever job the cloud emits. Frida defaults
-to `127.0.0.1:27042`.
-
-Frida attaches to Evony, while the rootless ZXTouch service provides system-level Unity
-touches and JPEG screenshots on `127.0.0.1:6000`. This avoids undocumented iOS HID
-constructors inside the game process.
+For local development (not an always-on runtime), `python -m venv .venv` and
+`pip install -r requirements.txt` can exercise the agent loop, but this does not prove
+on-phone dependency compatibility. Do not run a laptop and phone agent against the same
+queue concurrently. See [06 — runbook](../docs/06-runbook.md) for checks and failures.

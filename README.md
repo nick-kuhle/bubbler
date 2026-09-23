@@ -3,88 +3,99 @@
 Scheduled, self-service peace-treaty (bubble) automation for **Evony: The King's Return**,
 for alliance **LOL** (we don't take things seriously — we just have fun).
 
-Users link their Evony account once (Evony name + email + one-time 6-digit code), pick a
-schedule (default Mon morning / Wed morning / Fri evening UTC), and the system automatically
-applies the **3-day Truce Agreement** (2500 gems), overlapping so there is no lapse, verifies
-the shield is up, and closes the game again. No emulator, no VPS, no backend protocol
+Users link their Evony account (Evony name + email + one-time 6-digit code), pick a schedule
+(default Mon morning / Wed morning / Fri evening UTC), and the system is intended to apply
+and verify overlapping **3-day Truce Agreements** (2500 gems). No emulator or game-protocol
 reverse-engineering: the real Evony app runs on a real device.
 
-## Topology (v2 — zero always-on host machines)
+## Deployment topology (target — cutover pending)
 
-Everything smart lives in one place — **Vercel**. The only hardware in the loop is the
-jailbroken iPhone itself. There is no home server, no N150, no USB tethering, no tunnel, no
-domain.
+The goal is **GitHub for source, Vercel for the Next.js app + persistent data, and the
+jailbroken iPhone for the agent + Evony**. The current linking tests still rely on a local
+machine; do not unplug it or describe the standalone deployment as verified yet.
 
 ```
                        ┌─────────────────────────────────────────────────┐
-                       │  CLOUD — Vercel (NextJS + Postgres + Blob)     │
-                       │  email auth · wizard · schedules · master list  │
-                       │  scheduler (computed at poll time)              │
-                       │  long-poll event stream · run/evidence ledger   │
+                       │  CLOUD — Vercel (Next.js + Postgres + Blob)    │
+                       │  web UI · wizard · schedules · run ledger       │
+                       │  GET /api/agent/events long-poll endpoint      │
                        └───────────────▲────────────────┬────────────────┘
-                        user actions   │                │ event delivered
-                        (wizard, code) │                │ via always-open
-                                       │                │ long-poll (≈1s)
+                        user actions   │                │ event returned
+                        (wizard, code) │                │ on phone's next
+                                       │                │ outbound long-poll
                                        │                ▼
                        ┌───────────────┴────────────────────────────────┐
-                       │  PHONE — jailbroken iPhone XR (always-on)      │
+                       │  PHONE — jailbroken iPhone XR on WiFi         │
                        │  on-device Python agent (LaunchDaemon)         │
-                       │  long-polls /api/agent/events → drives Evony   │
-                        │  via Frida + ZXTouch (tap/type/screenshot)    │
-                       │  OpenCV/Apple Vision verify → reports to cloud │
+                       │  calls /api/agent/events → drives Evony       │
+                       │  local Frida + ZXTouch → reports to cloud      │
                        └────────────────────────────────────────────────┘
 ```
 
-The cloud is the **brain** (schedules, auth, people, ledger). The phone is the **hands and
-the player** in one device: it runs the real Evony client, and a tiny Python agent on the
-same device drives and verifies it.
+The cloud is the proposed control plane (people, schedules, jobs, ledger). The phone runs
+the real Evony client and the agent that drives it. The phone initiates all cloud traffic;
+Vercel does not connect back to the phone. No laptop, USB tunnel, or inbound phone port is
+needed **once the cutover is tested**.
 
-### How the always-on line works (long-polling)
+### The “poor man's WebSocket”
 
-Instead of polling on a timer, the phone keeps **one HTTP request open** to Vercel
-(`GET /api/agent/events`). Vercel holds the request (up to ~45s, under the Hobby function
-cap) and answers it **within ~1 second** the moment anything is queued: a scheduled run, a
-manual "Run now", a new linking session, or a submitted 6-digit code. After each response
-the phone immediately re-opens the line. There is no 5-minute lag anywhere; the worst case
-is one hold period (~45–50s).
+This is **HTTPS long-polling, not a WebSocket**. The phone makes an authenticated
+`GET /api/agent/events?hold=45`; the Vercel function checks the shared DB roughly every
+1.5 seconds for a job and returns an event or `{ "event": null }` after the hold. The phone
+immediately opens the next request. The browser polls wizard link status separately (every
+3 seconds). Jobs can arrive quickly while the phone and cloud are healthy, but these are
+**best-effort latencies**, not guaranteed delivery or a hard 1-second SLA. Network loss,
+phone sleep/reboot, deployment errors, or an agent crash can delay work indefinitely.
 
 ### The 90-second code window (linking)
 
-Evony only shows a 6-digit code entry for ~90 seconds, so first-time linking and re-links
-cannot tolerate any poll latency. The long-poll makes code delivery near-instant; on top of
-that the flow is **resend-tolerant**: if a code ever expires, the phone taps **resend**,
-Evony emails a fresh code with a fresh 90s, and the wizard tells the user to check their
-email again. The 90s is a per-attempt budget, never a hard deadline.
+Evony's one-time code entry is time-sensitive. The implemented link path queues a code event
+when the member submits the 6 digits in the wizard; the agent picks it up over the
+long-poll, enters it in Evony, confirms the account load, and reports the result. Retry/resend
+behavior and recovery from a dropped delivery still need standalone regression tests;
+see [the cutover checklist](docs/07-cutover.md).
 
-## Runtime model
+## Runtime model (target)
 
-Evony is **never left idle online** (a new-device login kicks the online user, so we never
-sit in-game). The web app + the phone's agent run all the time; the game boots only for the
-few minutes it takes to apply and verify a bubble, 3x/week.
+Evony should not be left idling online: a new-device login can kick the online user. The
+web app and phone agent should stay available; Evony opens only for a link or short bubble
+run and is closed afterward. Bubble application and verification are **not yet proven**.
 
 ## Repository layout
 
 ```
-README.md          this file
+README.md                this file
 docs/
-  01-product.md    product spec: linking flow, wizard, master list, schedules
-  02-architecture.md  system design: Vercel-converged topology, long-poll API, DB schema
-  03-phone-hardware.md device build: jailbreak, Frida bridge, agent bootstrap
-  04-evony-flow.md  game mechanics + run/link flows + calibration targets
-  05-security.md   outbound-only phone, tokens, code handling, ops guidelines
-  06-runbook.md    phone bring-up, agent install, troubleshooting
-webapp/            NextJS app (Vercel): screens + agent API (long-poll, runs, evidence)
-phone-agent/       on-device Python agent (long-poll loop, Evony orchestration, vision)
+  01-product.md          product spec and current gaps
+  02-architecture.md     cloud/phone topology and actual long-poll contract
+  03-phone-hardware.md   device build and on-device prerequisites
+  04-evony-flow.md       game mechanics and run/link flows
+  05-security.md         auth, token and code-handling caveats
+  06-runbook.md          operation and phone troubleshooting
+  07-cutover.md          staged local-machine → phone + Vercel migration
+webapp/                  Next.js app and API (target: Vercel)
+phone-agent/             Python agent, Evony orchestration and transport (target: phone)
 ```
 
-## Status
+## Status (2026-09-23; linking result reported by the operator)
 
-- Device is **jailbroken and online** (Dopamine 3 rootless, iOS 16.3.1). It is now a
-  standalone appliance on WiFi — no host computer is needed.
-- Web app scaffold + phone-agent scaffold: **built** (see per-folder READMEs). Calibration
-  screenshots, Frida bridge verification, and first end-to-end run remain.
-- The **90s code window**, **long-poll event delivery**, and **resend-tolerant linking**
-  are the core design and are implemented in the API contract + agent loop.
+- **Evony email/code linking: complete and successfully tested in the current setup with
+  new users and different emails.** The flow enters the code in Evony, completes the in-game
+  account load, and the link succeeds. This is *Evony account linking*, not app email
+  authentication. We have not repeated this test against a phone-only + Vercel deployment.
+- The agent loop and `/api/agent/events` long-poll path are implemented. **On-phone daemon,
+  WiFi-only operation, Vercel/managed-Postgres deployment and reboot recovery are not yet
+  verified.** The local machine is still part of the tested setup.
+- Scheduled bubble application, screenshot calibration and shield verification still need
+  end-to-end tests before unattended use.
+- **Production blocker:** app sign-in currently creates a session for anyone who submits an
+  allowed email; it does *not* send/verify a magic link. Do not expose real member accounts
+  on a public deployment until this is fixed. Code delivery also temporarily stores codes
+  in a DB job; see [security notes](docs/05-security.md).
+
+Next: [07 — cutover plan](docs/07-cutover.md). Preserve the working local setup until every
+gate there passes. A GitHub PAT is not needed for this repository session; never put a PAT,
+phone token, private key, or member database in a PR.
 
 ## ToS / risk warning
 
