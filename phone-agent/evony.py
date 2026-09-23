@@ -183,10 +183,10 @@ class EvonyController:
             time.sleep(1.8)
             log.info("entering email (len=%d)", len(email))
             self._enter_email(email)
-            if not self._wait_for_code_dialog(12):
-                return {"status": "failed", "error": "email was not submitted"}
             if on_waiting_code:
                 on_waiting_code()
+            if not self._wait_for_code_dialog(30):
+                log.warning("code dialog not confirmed; waiting for wizard code anyway")
         except CalibrationMissing as extra:
             return {"status": "failed", "error": f"calibration: {extra}"}
 

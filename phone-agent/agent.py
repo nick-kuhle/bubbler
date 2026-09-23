@@ -239,7 +239,7 @@ class CodeRelay:
 
     def get_code(self):
         try:
-            return self._codes.get(timeout=180)
+            return self._codes.get(timeout=600)
         except queue.Empty:
             return None
 
@@ -334,7 +334,7 @@ def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyCont
 
 
 def handle_event(cloud: CloudClient, evony: EvonyController, relay: CodeRelay | None,
-                 event: dict, cfg: dict) -> None:
+                 event: dict, cfg: dict, wait_link: bool = False) -> None:
     bundle_id = cfg["phone"]["evony_bundle_id"]
     kind = event.get("kind")
     payload = event.get("payload") or {}
@@ -352,9 +352,12 @@ def handle_event(cloud: CloudClient, evony: EvonyController, relay: CodeRelay | 
         return
 
     if kind == "link":
-        threading.Thread(target=run_link,
-                         args=(cloud, event, relay, evony, bundle_id),
-                         daemon=True).start()
+        t = threading.Thread(target=run_link,
+                             args=(cloud, event, relay, evony, bundle_id),
+                             daemon=True)
+        t.start()
+        if wait_link:
+            t.join()
         return
 
     result = run_one(evony, event, bundle_id)
@@ -402,7 +405,7 @@ def main() -> None:
             continue
 
         if event:
-            handle_event(cloud, evony, relay, event, cfg)
+            handle_event(cloud, evony, relay, event, cfg, wait_link=args.once)
         if args.once:
             break
 
