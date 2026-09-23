@@ -1,15 +1,15 @@
 :root {
-  --bg: #fff4c8;
-  --bg2: #ffd6e7;
+  --bg: #063a5c;
+  --bg2: #0b6b8a;
   --card: #fffdf7;
-  --edge: #ffc14d;
-  --text: #3d2412;
-  --muted: #9a6840;
+  --edge: #7ad7ff;
+  --text: #14324a;
+  --muted: #3d6f88;
   --acc: #ff4d8d;
-  --acc2: #ffb703;
+  --acc2: #ffd36a;
   --ok: #22a36b;
   --warn: #e07a2f;
-  --shadow: 0 8px 0 rgba(255, 77, 141, 0.18);
+  --shadow: 0 8px 0 rgba(10, 90, 130, 0.22);
 }
 
 * { box-sizing: border-box; }
@@ -18,35 +18,60 @@ html, body {
   margin: 0;
   min-height: 100%;
   background:
-    radial-gradient(circle at 12% 18%, #ffe07a 0 90px, transparent 91px),
-    radial-gradient(circle at 88% 8%, #ff9ec4 0 70px, transparent 71px),
-    radial-gradient(circle at 80% 78%, #7fd4ff 0 110px, transparent 111px),
-    radial-gradient(circle at 8% 88%, #b8f2c9 0 80px, transparent 81px),
-    linear-gradient(165deg, #fff3b0 0%, #ffd9e8 48%, #cfefff 100%);
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 255, 255, 0.35), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(122, 215, 255, 0.35), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 15% 70%, rgba(0, 180, 170, 0.28), transparent 55%),
+    linear-gradient(180deg, #7ad7ff 0%, #1e90c7 28%, #0b6b8a 62%, #063a5c 100%);
   color: var(--text);
   font: 16px/1.5 ui-rounded, "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
 }
 
 body { position: relative; overflow-x: hidden; }
+body::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.18) 0 2px, transparent 3px),
+    radial-gradient(circle at 70% 55%, rgba(255, 255, 255, 0.12) 0 1px, transparent 2px);
+  opacity: 0.7;
+}
 
 .bubbles { pointer-events: none; position: fixed; inset: 0; z-index: 0; overflow: hidden; }
 .bubbles span {
   position: absolute;
+  bottom: -40px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.45);
-  border: 2px solid rgba(255, 255, 255, 0.7);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.95), rgba(180, 230, 255, 0.25) 55%, rgba(255, 255, 255, 0.08));
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: inset -4px -6px 10px rgba(10, 80, 120, 0.18);
   animation: float-up 14s linear infinite;
 }
-.bubbles span:nth-child(1) { width: 28px; height: 28px; left: 8%; animation-duration: 16s; }
-.bubbles span:nth-child(2) { width: 18px; height: 18px; left: 26%; animation-duration: 11s; animation-delay: -3s; }
-.bubbles span:nth-child(3) { width: 36px; height: 36px; left: 52%; animation-duration: 18s; animation-delay: -6s; }
-.bubbles span:nth-child(4) { width: 22px; height: 22px; left: 73%; animation-duration: 13s; animation-delay: -2s; }
-.bubbles span:nth-child(5) { width: 14px; height: 14px; left: 91%; animation-duration: 10s; animation-delay: -5s; }
+.bubbles span:nth-child(1) { width: 28px; height: 28px; left: 4%; animation-duration: 16s; }
+.bubbles span:nth-child(2) { width: 14px; height: 14px; left: 11%; animation-duration: 11s; animation-delay: -3s; }
+.bubbles span:nth-child(3) { width: 36px; height: 36px; left: 18%; animation-duration: 18s; animation-delay: -6s; }
+.bubbles span:nth-child(4) { width: 20px; height: 20px; left: 27%; animation-duration: 13s; animation-delay: -2s; }
+.bubbles span:nth-child(5) { width: 12px; height: 12px; left: 35%; animation-duration: 9s; animation-delay: -5s; }
+.bubbles span:nth-child(6) { width: 42px; height: 42px; left: 44%; animation-duration: 20s; animation-delay: -8s; }
+.bubbles span:nth-child(7) { width: 16px; height: 16px; left: 52%; animation-duration: 12s; animation-delay: -1s; }
+.bubbles span:nth-child(8) { width: 24px; height: 24px; left: 60%; animation-duration: 15s; animation-delay: -7s; }
+.bubbles span:nth-child(9) { width: 10px; height: 10px; left: 68%; animation-duration: 8s; animation-delay: -4s; }
+.bubbles span:nth-child(10) { width: 32px; height: 32px; left: 74%; animation-duration: 17s; animation-delay: -9s; }
+.bubbles span:nth-child(11) { width: 18px; height: 18px; left: 82%; animation-duration: 11s; animation-delay: -2.5s; }
+.bubbles span:nth-child(12) { width: 46px; height: 46px; left: 90%; animation-duration: 22s; animation-delay: -11s; }
+.bubbles span:nth-child(13) { width: 13px; height: 13px; left: 7%; animation-duration: 10s; animation-delay: -12s; }
+.bubbles span:nth-child(14) { width: 22px; height: 22px; left: 39%; animation-duration: 14s; animation-delay: -6.5s; }
+.bubbles span:nth-child(15) { width: 8px; height: 8px; left: 96%; animation-duration: 7s; animation-delay: -3.5s; }
+.bubbles span:nth-child(16) { width: 26px; height: 26px; left: 23%; animation-duration: 19s; animation-delay: -14s; }
+.bubbles span:nth-child(17) { width: 15px; height: 15px; left: 56%; animation-duration: 13s; animation-delay: -10s; }
+.bubbles span:nth-child(18) { width: 30px; height: 30px; left: 86%; animation-duration: 16s; animation-delay: -5.5s; }
 
 @keyframes float-up {
-  0% { transform: translateY(110vh) scale(0.8); opacity: 0; }
-  12% { opacity: 0.7; }
-  100% { transform: translateY(-12vh) scale(1.1); opacity: 0; }
+  0% { transform: translateY(0) scale(0.8); opacity: 0; }
+  8% { opacity: 0.85; }
+  100% { transform: translateY(-115vh) scale(1.15); opacity: 0; }
 }
 
 .shell {
@@ -56,7 +81,7 @@ body { position: relative; overflow-x: hidden; }
   align-items: center;
   gap: 1.4rem;
   padding: 0.85rem 1.4rem;
-  background: rgba(255, 253, 247, 0.82);
+  background: rgba(255, 253, 247, 0.88);
   border-bottom: 3px solid var(--acc2);
   backdrop-filter: blur(8px);
 }

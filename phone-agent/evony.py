@@ -52,7 +52,10 @@ def load_calibration(path: str) -> "Calibration":
         if not isinstance(roi, list) or len(roi) != 4 or not all(isinstance(v, int) for v in roi):
             raise CalibrationMissing("shield_countdown_roi must be four integers")
         roi = tuple(roi)
-    return Calibration(screens=screens, shield_countdown_roi=roi)
+    meta = raw.get("screen") if isinstance(raw.get("screen"), dict) else {}
+    cal_w = int(meta.get("width") or 828)
+    cal_h = int(meta.get("height") or 1792)
+    return Calibration(screens=screens, shield_countdown_roi=roi, screen_size=(cal_w, cal_h))
 
 
 @dataclass
@@ -65,6 +68,7 @@ class Calibration:
 
     screens: dict[str, dict]
     shield_countdown_roi: tuple[int, int, int, int] | None = None
+    screen_size: tuple[int, int] = (828, 1792)
 
 
 class EvonyController:
@@ -72,6 +76,7 @@ class EvonyController:
         self.t = transport
         self.v = vision
         self.cal = calibration
+        self._device_size: tuple[int, int] | None = None
 
     # -- guards --------------------------------------------------------
     def on_screen(self, name: str, screenshot: bytes | None = None) -> bool:
@@ -85,29 +90,29 @@ class EvonyController:
         screen = screenshot if screenshot else self.t.screenshot()
         return self.v.find_template(screen, template) is not None
 
+    def device_xy(self, x: int, y: int) -> tuple[int, int]:
+        cal_w, cal_h = (self.cal.screen_size if self.cal else (828, 1792))
+        if self._device_size is None:
+            try:
+                self._device_size = self.t.screen_size()
+                log.info("ZXTouch screen size %s", self._device_size)
+            except Exception as exc:
+                self._device_size = (414, 896)
+                log.warning("ZXTouch screen size failed (%s); using points %s", exc, self._device_size)
+        dw, dh = self._device_size
+        return max(1, int(round(x * dw / cal_w))), max(1, int(round(y * dh / cal_h)))
+
     def tap(self, screen: str, tap: str = "primary") -> None:
         if not self.cal or screen not in self.cal.screens:
             raise CalibrationMissing(f"no calibration for screen '{screen}'")
         point = self.cal.screens[screen].get("taps", {}).get(tap)
         if not point:
             raise CalibrationMissing(f"no tap '{tap}' for screen '{screen}'")
-        self.t.tap(int(point["x"]), int(point["y"]))
+        x, y = self.device_xy(int(point["x"]), int(point["y"]))
+        self.t.tap(x, y)
 
     def tap_pair(self, screen: str, tap: str = "primary") -> None:
-        """Tap a calibrated pixel point and its @2x UIKit-point twin.
-
-        Screenshots are 828x1792; ZXTouch may want pixels or points. Hitting both
-        is harmless on this loading/login UI and covers either coordinate space.
-        """
-        if not self.cal or screen not in self.cal.screens:
-            raise CalibrationMissing(f"no calibration for screen '{screen}'")
-        point = self.cal.screens[screen].get("taps", {}).get(tap)
-        if not point:
-            raise CalibrationMissing(f"no tap '{tap}' for screen '{screen}'")
-        x, y = int(point["x"]), int(point["y"])
-        self.t.tap(x, y)
-        time.sleep(0.05)
-        self.t.tap(max(1, x // 2), max(1, y // 2))
+        self.tap(screen, tap)
 
     # -- run flow ------------------------------------------------------
     def open_evony(self, bundle_id: str, settle: float = 0.25) -> None:
@@ -178,7 +183,7 @@ class EvonyController:
         submitted 6-digit code (long-poll). Returns result dict (linked/failed/expired)."""
         try:
             self.launch_login_screen()
-            time.sleep(0.5)
+            time.sleep(0.8)
             self.tap_pair("email_login", "email")
             time.sleep(0.5)
             self.t.type_text(email)
@@ -217,37 +222,26 @@ class EvonyController:
             self.tap_resend()
 
     def _account_icon_points(self) -> list[tuple[int, int]]:
-        """Top-left account icon: screenshot pixels plus @2x points, with jitter."""
+        """Gold person icon on the loading screen (screenshot pixels → device coords)."""
         spec = (self.cal.screens.get("email_login") or {}) if self.cal else {}
         raw = (spec.get("taps") or {}).get("email_button") or {"x": 50, "y": 248}
-        x, y = int(raw["x"]), int(raw["y"])
-        px = [(x, y), (x - 16, y), (x + 16, y), (x, y - 18), (x, y + 18), (x + 12, y + 12)]
-        pts = [(max(1, a // 2), max(1, b // 2)) for a, b in px]
-        return [(a, b) for a, b in px + pts if a > 0 and b > 0]
+        x, y = self.device_xy(int(raw["x"]), int(raw["y"]))
+        jitter = [(0, 0), (-8, 0), (8, 0), (0, -10), (0, 10), (6, 8), (-6, 8)]
+        return [(max(1, x + dx), max(1, y + dy)) for dx, dy in jitter]
 
     def launch_login_screen(self) -> None:
-        """Hammer the top-left account icon for the whole loading screen.
-
-        The gold person button is only tappable while Evony is loading/connecting.
-        It is small and flaky — tap a cluster around it, repeatedly, in both
-        pixel and point space, until the Switch Account dialog can appear.
-        """
+        """Hammer the top-left account icon for the whole loading screen."""
         if not self.cal or "email_login" not in self.cal.screens:
             raise CalibrationMissing("no calibration for screen 'email_login'")
-        spec = self.cal.screens["email_login"]
-        template = spec.get("template")
-        try_tap = getattr(self.t, "try_tap_template", None)
         points = self._account_icon_points()
-        deadline = time.monotonic() + 22
+        log.info("login icon taps (device xy): %s", points)
+        deadline = time.monotonic() + 25
         i = 0
         while time.monotonic() < deadline:
-            if template and try_tap and try_tap(template):
-                time.sleep(0.5)
-                return
             x, y = points[i % len(points)]
             self.t.tap(x, y)
             i += 1
-            time.sleep(0.1)
+            time.sleep(0.08)
         time.sleep(0.3)
 
     def tap_resend(self) -> None:

@@ -311,7 +311,7 @@ def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyCont
     result = {"status": "failed", "error": "unexpected"}
     try:
         cloud.report_link(link_id, {"status": "awaiting_phone"})
-        evony.open_evony(bundle_id, settle=0.05)
+        evony.open_evony(bundle_id, settle=0)
         result = evony.link_login(
             event.get("email", ""),
             get_code=relay.get_code,

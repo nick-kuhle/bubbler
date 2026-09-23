@@ -62,6 +62,9 @@ export default async function LocaleLayout({
         <NextIntlClientProvider locale={locale} messages={messages}>
           <div className="bubbles" aria-hidden>
             <span /><span /><span /><span /><span />
+            <span /><span /><span /><span /><span />
+            <span /><span /><span /><span /><span />
+            <span /><span /><span />
           </div>
           <header className="shell">
             <Link href="/" className="brand">

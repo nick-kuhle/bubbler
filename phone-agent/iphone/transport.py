@@ -38,12 +38,20 @@ class ZXTouchClient:
         if self._socket is None:
             self._socket = socket.create_connection((self.host, self.port), self.timeout)
             self._socket.settimeout(self.timeout)
+            self._buffer = bytearray()
         return self._socket
 
+    def _reset(self) -> None:
+        self.close()
+        self._buffer = bytearray()
+
     def _send(self, task: int, *parts: object) -> None:
-        self._connect().sendall(
-            (str(task) + ";;".join(str(part) for part in parts) + "\r\n").encode()
-        )
+        payload = ";;".join([str(task), *(str(part) for part in parts)]) + "\r\n"
+        try:
+            self._connect().sendall(payload.encode())
+        except OSError:
+            self._reset()
+            self._connect().sendall(payload.encode())
 
     def _line(self) -> bytes:
         while b"\r\n" not in self._buffer:
@@ -57,11 +65,20 @@ class ZXTouchClient:
         return line
 
     def tap(self, x: int, y: int) -> None:
-        down = f"11{5:02d}{int(x * 10):05d}{int(y * 10):05d}"
-        up = f"10{5:02d}{int(x * 10):05d}{int(y * 10):05d}"
+        x10 = max(0, min(99999, int(round(x * 10))))
+        y10 = max(0, min(99999, int(round(y * 10))))
+        down = f"11{0:02d}{x10:05d}{y10:05d}"
+        up = f"10{0:02d}{x10:05d}{y10:05d}"
         self._send(self.TOUCH, down)
-        time.sleep(0.08)
+        time.sleep(0.05)
         self._send(self.TOUCH, up)
+
+    def screen_size(self) -> tuple[int, int]:
+        self._send(13)
+        line = self._line()[:-2].decode(errors="replace").split(";;")
+        if len(line) >= 3 and line[0] == "0":
+            return int(float(line[1])), int(float(line[2]))
+        raise FridaDown(f"ZXTouch screen size failed: {line!r}")
 
     def type_text(self, text: str) -> None:
         for character in text:
@@ -88,7 +105,7 @@ class ZXTouchClient:
         return data
 
     def switch_to_app(self, bundle_id: str) -> None:
-        self._send(11, bundle_id)
+        self._send(1, bundle_id)
         if not self._line().startswith(b"0"):
             raise FridaDown(f"ZXTouch could not foreground {bundle_id}")
 
