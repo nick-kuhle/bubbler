@@ -46,7 +46,7 @@ class ZXTouchClient:
         self._buffer = bytearray()
 
     def _send(self, task: int, *parts: object) -> None:
-        payload = ";;".join([str(task), *(str(part) for part in parts)]) + "\r\n"
+        payload = f"{int(task)}{(';;'.join(str(part) for part in parts))}\r\n"
         try:
             self._connect().sendall(payload.encode())
         except OSError:
@@ -67,8 +67,8 @@ class ZXTouchClient:
     def tap(self, x: int, y: int) -> None:
         x10 = max(0, min(99999, int(round(x * 10))))
         y10 = max(0, min(99999, int(round(y * 10))))
-        down = f"11{0:02d}{x10:05d}{y10:05d}"
-        up = f"10{0:02d}{x10:05d}{y10:05d}"
+        down = f"11{1:02d}{x10:05d}{y10:05d}"
+        up = f"10{1:02d}{x10:05d}{y10:05d}"
         self._send(self.TOUCH, down)
         time.sleep(0.12)
         self._send(self.TOUCH, up)
@@ -105,7 +105,7 @@ class ZXTouchClient:
         return data
 
     def switch_to_app(self, bundle_id: str) -> None:
-        self._send(1, bundle_id)
+        self._send(11, bundle_id)
         if not self._line().startswith(b"0"):
             raise FridaDown(f"ZXTouch could not foreground {bundle_id}")
 
@@ -200,19 +200,17 @@ class FridaTouch:
         self._touch.type_text(str(text))
 
     def launch(self, bundle_id: str) -> None:
-        """Force-kill Evony on the phone, then cold-start it."""
+        """Kill Evony, then start it without waiting for the splash to finish."""
         if bundle_id != self.bundle_id:
             raise FridaDown(f"transport configured for {self.bundle_id}, not {bundle_id}")
         close_app(bundle_id)
-        time.sleep(0.6)
-        try:
-            self._touch.switch_to_app(bundle_id)
-        except FridaDown:
-            try:
-                pid = self._ensure_device().spawn([bundle_id])
-                self._device.resume(pid)
-            except Exception as exc:
-                raise FridaDown(f"could not launch {bundle_id}: {exc}") from exc
+        time.sleep(0.5)
+        key = Path("/tmp/opencode/bubbler_phone_ed25519")
+        cmd = ["uiopen", "--bundleid", bundle_id]
+        if key.exists():
+            cmd = ["ssh", "-i", str(key), "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
+                   "mobile@192.168.1.166", f"uiopen --bundleid {bundle_id}"]
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def wait_for_template(self, template_name: str, timeout: float = 30) -> bool:
         if not self._touch_template_dir:

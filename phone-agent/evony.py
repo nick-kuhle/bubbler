@@ -299,22 +299,24 @@ class EvonyController:
         log.info("login icon taps (px): %s", points)
         if bundle_id:
             self.t.launch(bundle_id)
-        if not self._wait_for_splash(18):
-            log.warning("evony splash did not appear")
-            return False
+        start = time.monotonic()
+        x, y = points[0]
+        for n in range(1, 11):
+            log.info("login icon tap %s,%s #%s (+%.0fms)", x, y, n, (time.monotonic() - start) * 1000)
+            try:
+                self.t.tap(x, y)
+            except Exception as exc:
+                log.warning("login tap failed: %s", exc)
+            time.sleep(0.4)
         if self._dialog_visible():
             return True
-        for x, y in points:
-            for n in range(1, 5):
-                log.info("login icon tap %s,%s #%s", x, y, n)
-                try:
-                    self.t.tap(x, y)
-                except Exception as exc:
-                    log.warning("login tap failed: %s", exc)
-                time.sleep(0.5)
-            if self._dialog_visible():
-                return True
-            time.sleep(0.6)
+        for x, y in points[1:]:
+            log.info("login icon tap %s,%s fallback", x, y)
+            try:
+                self.t.tap(x, y)
+            except Exception as exc:
+                log.warning("login tap failed: %s", exc)
+            time.sleep(0.4)
         return self._dialog_visible()
 
     def tap_resend(self) -> None:
