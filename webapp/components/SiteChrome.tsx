@@ -32,7 +32,7 @@ export default function SiteChrome({
           <img src="/images/logo.png" alt="" />
           <span>
             <span className="lol">LOL</span>
-            <span className="title-gold">bubbler</span>
+            <span className="title-pop">bubbler</span>
           </span>
         </Link>
         <nav>
@@ -66,7 +66,7 @@ export default function SiteChrome({
       <main>{children}</main>
       <footer className="site-foot">
         <p>{dict.info.privateBody}</p>
-        <p className="sig">ALLIANCE LOL · KEEP THE BUBBLES UP</p>
+        <p className="sig">💙 ALLIANCE LOL · KEEP THE BUBBLES UP 💙</p>
       </footer>
       <nav className="bottom-nav">
         {items.map((n) => (

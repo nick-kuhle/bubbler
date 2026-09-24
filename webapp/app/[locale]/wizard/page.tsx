@@ -41,8 +41,8 @@ export default async function WizardPage({
     if (scheduled) {
       return (
         <section className="card" style={{ maxWidth: 560, margin: "3rem auto", textAlign: "center" }}>
-          <p className="ok" style={{ fontSize: "1.6rem", margin: "0 0 0.4rem" }}>✓</p>
-          <h2 style={{ margin: "0 0 0.3rem" }}>{w.alreadyTitle}</h2>
+          <span className="check" aria-hidden>✓</span>
+          <h2 style={{ margin: "0.6rem 0 0.3rem" }}>{w.alreadyTitle}</h2>
           <p className="muted">{w.alreadyBody}</p>
           <div className="row" style={{ justifyContent: "center", marginTop: "1rem" }}>
             <Link className="btn" href="/dashboard">{w.goDashboard}</Link>
@@ -56,10 +56,10 @@ export default async function WizardPage({
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
-        <img src="/images/truce.jpg" alt="" className="thumb" style={{ width: "4.5rem", height: "4.5rem", borderRadius: "1rem" }} />
+        <span className="tile" aria-hidden>🛡️</span>
         <div>
           <p className="kicker">Truce Agreement</p>
-          <h2 className="title-gold font-display" style={{ margin: "0.15rem 0 0" }}>{w.title}</h2>
+          <h2 className="title-pop font-display" style={{ margin: "0.15rem 0 0" }}>{w.title}</h2>
         </div>
       </div>
       <WizardForm dict={dict} />

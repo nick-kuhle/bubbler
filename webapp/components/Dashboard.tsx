@@ -71,7 +71,7 @@ function ShieldRing({ hours, max = 72 }: { hours: number; max?: number }) {
   const dash = c * pct;
   return (
     <svg viewBox="0 0 100 100" className="shield-glow" style={{ width: "7rem", height: "7rem" }}>
-      <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(232,197,107,0.18)" strokeWidth="8" />
+      <circle cx="50" cy="50" r={r} fill="rgba(255,255,255,0.75)" stroke="#d8e4f6" strokeWidth="8" />
       <circle
         cx="50"
         cy="50"
@@ -85,15 +85,14 @@ function ShieldRing({ hours, max = 72 }: { hours: number; max?: number }) {
       />
       <defs>
         <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#7ad7ff" />
-          <stop offset="55%" stopColor="#ff4d8d" />
-          <stop offset="100%" stopColor="#f8e7a0" />
+          <stop offset="0%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#1d4ed8" />
         </linearGradient>
       </defs>
-      <text x="50" y="48" textAnchor="middle" fill="#f8e7a0" fontSize="16" fontWeight="800" fontFamily="Cinzel, serif">
+      <text x="50" y="48" textAnchor="middle" fill="#1e3a8a" fontSize="16" fontWeight="800" fontFamily="'Baloo 2', sans-serif">
         {hours.toFixed(0)}h
       </text>
-      <text x="50" y="64" textAnchor="middle" fill="#7ad7ff" fontSize="8" fontWeight="700" letterSpacing="1.5">
+      <text x="50" y="64" textAnchor="middle" fill="#2563eb" fontSize="8" fontWeight="800" letterSpacing="1.5">
         SHIELD
       </text>
     </svg>
@@ -278,14 +277,14 @@ export default function Dashboard({ dict }: { dict: Dict }) {
   return (
     <section className="stack" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <section className="keep-hero">
-        <img src="/images/keep.jpg" alt="" className="cover" />
+        <img src="/images/sky-hero.jpg" alt="" className="cover" />
         <div className="veil" />
         <div className="copy hsplit">
           <div style={{ display: "flex", alignItems: "flex-end", gap: "0.8rem" }}>
-            <img src="/images/general.jpg" alt="" className="avatar" />
+            <img src="/images/logo.png" alt="" className="avatar" />
             <div>
               <p className="kicker">{roleBadge} · {me.user.evony_name}</p>
-              <h1 className="title-gold font-display" style={{ margin: "0.15rem 0 0", fontSize: "clamp(1.7rem, 4vw, 2.6rem)" }}>
+              <h1 className="title-pop font-display" style={{ margin: "0.15rem 0 0", fontSize: "clamp(1.7rem, 4vw, 2.6rem)" }}>
                 {d.title}
               </h1>
               <p className="muted" style={{ margin: "0.25rem 0 0", maxWidth: 460 }}>{d.intro}</p>
@@ -304,21 +303,21 @@ export default function Dashboard({ dict }: { dict: Dict }) {
 
       <div className="stat-grid">
         <div className="card stat">
-          <img src="/images/gem.png" alt="" className="thumb" />
+          <span className="tile sun sm" aria-hidden>💎</span>
           <div>
             <p className="lbl">{d.gemsCol}</p>
             <p className="val">2,500</p>
           </div>
         </div>
         <div className="card stat">
-          <img src="/images/truce.jpg" alt="" className="thumb" />
+          <span className="tile sm" aria-hidden>🛡️</span>
           <div>
             <p className="lbl">{d.lastRun}</p>
             <p className="val">{remaining > 0 ? `${remaining.toFixed(1)}h` : "—"}</p>
           </div>
         </div>
         <div className="card stat">
-          <img src="/images/logo.png" alt="" className="thumb" />
+          <span className="tile green sm" aria-hidden>⏰</span>
           <div>
             <p className="lbl">{d.runTitle}</p>
             <p className="val">{next ? countdown(nextTs - nowTs) : d.never}</p>
@@ -326,9 +325,15 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         </div>
       </div>
 
+      <div className="cols-2">
       <section className="card">
-        <h3>{d.profileTitle}</h3>
-        <p className="muted">{d.profileBody}</p>
+        <div className="section-head">
+          <span className="tile sm" aria-hidden>😊</span>
+          <div>
+            <h3>{d.profileTitle}</h3>
+            <p className="muted">{d.profileBody}</p>
+          </div>
+        </div>
         <label className="field">
           <span>{d.emailLabel}</span>
           <input
@@ -358,12 +363,28 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         </div>
       </section>
 
-      <TestConnection dict={dict} />
-      <AgentStatus dict={dict} />
+      <div className="stack-sm">
+        <TestConnection dict={dict} />
+        <section className="card">
+          <div className="section-head" style={{ marginBottom: "0.6rem" }}>
+            <span className="tile sm" aria-hidden>📡</span>
+            <div>
+              <h3>{dict.agentStatus.title}</h3>
+            </div>
+          </div>
+          <AgentStatus dict={dict} />
+        </section>
+      </div>
+      </div>
 
       <section className="card">
         <div className="hsplit" style={{ marginBottom: "0.6rem" }}>
-          <h3>{d.slotsTitle}</h3>
+          <div className="section-head" style={{ marginBottom: 0 }}>
+            <span className="tile sm" aria-hidden>📅</span>
+            <div>
+              <h3>{d.slotsTitle}</h3>
+            </div>
+          </div>
           <button onClick={() => void toggle()} disabled={edit.busy}>
             {enabled ? d.toggleOff : d.toggleOn}
           </button>
@@ -392,9 +413,11 @@ export default function Dashboard({ dict }: { dict: Dict }) {
 
       <section className="card">
         <div className="hsplit">
-          <div>
-            <h3>{d.runTitle}</h3>
-            {next ? (
+          <div className="section-head" style={{ marginBottom: 0 }}>
+            <span className="tile sm" aria-hidden>🚀</span>
+            <div>
+              <h3>{d.runTitle}</h3>
+              {next ? (
               <p className="ok" style={{ margin: "0.3rem 0 0" }}>
                 {d[DAY_KEYS[next.weekday - 1]]} {next.time}
                 {" · "}{d.in} {countdown(nextTs - nowTs)}
@@ -402,6 +425,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
             ) : (
               <p className="muted" style={{ margin: "0.3rem 0 0" }}>{enabled ? d.never : d.disabledNote}</p>
             )}
+            </div>
           </div>
           <button onClick={() => void runNow()} disabled={run.busy}>
             {run.busy ? d.running : d.runNow}

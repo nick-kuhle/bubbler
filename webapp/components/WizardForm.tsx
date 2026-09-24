@@ -202,8 +202,8 @@ export default function WizardForm({ dict }: Props) {
   if (already) {
     return (
       <section className="card" style={{ maxWidth: 560, margin: "3rem auto", textAlign: "center" }}>
-        <p className="ok" style={{ fontSize: "1.6rem", margin: "0 0 0.4rem" }}>✓</p>
-        <h2 style={{ margin: "0 0 0.3rem" }}>{w.alreadyTitle}</h2>
+        <span className="check" aria-hidden>✓</span>
+        <h2 style={{ margin: "0.6rem 0 0.3rem" }}>{w.alreadyTitle}</h2>
         <p className="muted">{w.alreadyBody}</p>
         <div className="row" style={{ justifyContent: "center", marginTop: "1rem" }}>
           <Link className="btn" href="/dashboard">{w.goDashboard}</Link>
@@ -215,8 +215,9 @@ export default function WizardForm({ dict }: Props) {
 
   if (state === "failed" || state === "expired") {
     return (
-      <section className="card" style={{ maxWidth: 560, margin: "3rem auto" }}>
-        <h2 className="warn" style={{ marginBottom: "0.3rem" }}>
+      <section className="card" style={{ maxWidth: 560, margin: "3rem auto", textAlign: "center" }}>
+        <span className="tile sun" aria-hidden>😅</span>
+        <h2 style={{ margin: "0.6rem 0 0.3rem" }}>
           {state === "expired" ? w.expiredTitle : w.failedTitle}
         </h2>
         <p className="muted">{state === "expired" ? w.expiredBody : w.failedBody}</p>
@@ -226,19 +227,26 @@ export default function WizardForm({ dict }: Props) {
   }
 
   return (
-    <section className="card" style={{ maxWidth: 560, margin: "3rem auto" }}>
-      <h2 style={{ marginBottom: "0.2rem" }}>{w.title}</h2>
-      <p className="muted" style={{ margin: 0 }}>{w.intro}</p>
+    <section className="card" style={{ maxWidth: 600, margin: "0 auto" }}>
+      <div className="section-head">
+        <span className="tile" aria-hidden>🔗</span>
+        <div>
+          <h2 style={{ marginBottom: "0.2rem" }}>{w.title}</h2>
+          <p className="muted" style={{ margin: 0 }}>{w.intro}</p>
+        </div>
+      </div>
 
-      <div className="steps">
-        {Array.from({ length: STEPS }, (_, i) => i + 1).map((n) => (
-          <span
-            key={n}
-            className={`dot${n < step ? " done" : ""}${n === step ? " active" : ""}`}
-            aria-label={`${w.step} ${n}`}
-          />
-        ))}
-        <span className="counter">{w.step} {step} {w.of} {STEPS}</span>
+      <div className="steps" role="list" aria-label={`${w.step} ${step} ${w.of} ${STEPS}`}>
+        {w.stepsShort.map((label, i) => {
+          const n = i + 1;
+          const cls = n < step ? "done" : n === step ? "active" : "";
+          return (
+            <span key={label} role="listitem" className={`step ${cls}`.trim()}>
+              <span className="n" aria-hidden>{n < step ? "✓" : n}</span>
+              {label}
+            </span>
+          );
+        })}
       </div>
 
       {step === 1 && (
@@ -330,8 +338,8 @@ export default function WizardForm({ dict }: Props) {
 
       {step === 6 && (
         <div style={{ textAlign: "center" }}>
-          <p className="ok" style={{ fontSize: "1.6rem", margin: "0 0 0.4rem" }}>✓</p>
-          <h3 style={{ margin: "0 0 0.3rem" }}>{w.step6Title}</h3>
+          <span className="check" aria-hidden>✓</span>
+          <h3 style={{ margin: "0.6rem 0 0.3rem" }}>{w.step6Title}</h3>
           <p className="muted">{w.step6Body}</p>
           <Link className="btn" href="/dashboard" style={{ marginTop: "0.5rem", display: "inline-block" }}>
             {w.toDashboard}

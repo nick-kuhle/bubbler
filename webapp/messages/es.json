@@ -5,9 +5,25 @@
   "nav": {
     "home": "inicio",
     "dashboard": "panel",
-    "info": "información",
-    "master": "operador",
+    "info": "cómo funciona",
+    "master": "sala de guerra",
     "wizard": "vincular una cuenta"
+  },
+  "landing": {
+    "kicker": "Alianza LOL",
+    "title": "Tu burbuja, siempre activa.",
+    "sub": "LOL mantiene escudos de paz de 3 días superpuestos en tu ciudad — automáticamente. Tú juega y diviértete; nosotros vigilamos el temporizador.",
+    "email": "correo del juego",
+    "emailPh": "tu@correo.com",
+    "signin": "entrar",
+    "busy": "entrando…",
+    "how": "cómo funciona",
+    "f1t": "Escudos de 72 horas",
+    "f1b": "Una tregua fresca de 3 días llega antes de que termine la anterior. Sin pausas, sin estrés.",
+    "f2t": "2500 gemas por turno",
+    "f2b": "El juego gasta las gemas de cada tregua — tú solo apruebas el plan una vez.",
+    "f3t": "Hecho para LOL",
+    "f3b": "Un círculo acogedor, cero drama. No hacemos seriedad — hacemos escudos."
   },
   "defaultSlots": {
     "mon": "lunes por la mañana · 09:00",
@@ -109,6 +125,7 @@
     "linkAgain": "vincular otra cuenta",
     "step": "paso",
     "of": "de",
+    "stepsShort": ["Cuenta", "Juego", "Código", "Enlace", "Plan", "Listo"],
     "step1Title": "Tu cuenta de Evony",
     "step1Body": "Introduce la cuenta que LOL debe proteger — tu correo de acceso ya está guardado.",
     "accountLabel": "ID de cuenta de Evony",

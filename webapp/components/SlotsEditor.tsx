@@ -118,6 +118,7 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
 
   return (
     <div>
+      <div className="table-scroll">
       <table>
         <thead>
           <tr>
@@ -170,9 +171,9 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
               <td>
                 <button
                   type="button"
+                  className="btn-icon"
                   onClick={() => remove(s.key)}
                   aria-label={`${d.removeSlot}: ${d[DAY_KEYS[s.weekday - 1]]} ${s.time}`}
-                  style={{ background: "transparent", color: "var(--muted)", padding: "0.3rem 0.5rem" }}
                 >
                   ×
                 </button>
@@ -186,6 +187,7 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
           )}
         </tbody>
       </table>
+      </div>
 
       <button
         type="button"

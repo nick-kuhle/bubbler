@@ -35,7 +35,7 @@ export default function UnlinkButton({ dict, onUnlinked }: Props) {
 
   return (
     <div>
-      <button type="button" onClick={() => void unlink()} disabled={busy}>
+      <button type="button" className="btn-danger-soft" onClick={() => void unlink()} disabled={busy}>
         {busy ? d.unlinking : d.unlink}
       </button>
       {error && <p className="warn" role="alert">{d.unlinkError}</p>}
