@@ -8,18 +8,27 @@ Loop:
 
 Run events execute Evony and report through POST /api/agent/runs (+ raw-PNG evidence).
 Link events start an interactive login that posts awaiting_phone/awaiting_code and then
-*waits* for a subsequent `code` event on the same stream.
+*waits* for a subsequent `code` event on the same stream. Test events reopen Evony, sign
+in as the member's email without a code and verify the in-game name.
+
+Heartbeat: every poll sends `?v=VER&host=NAME&pid=N`; the cloud stamps agent_health so the
+dashboard knows the phone is alive (docs/06). Watchdog: the loop exits when the cloud is
+unreachable for `cloud.max_failures` consecutive polls or nothing rounds in
+`cloud.max_idle_sec` — any supervisor (launchd KeepAlive / systemd Restart) then relaunches
+us fresh instead of letting a hung transport kill the phone silently.
 
 Usage:
     python agent.py --once        # one long-poll round, then exit
-    python agent.py               # run forever (as a LaunchDaemon)
+    python agent.py               # run forever (supervised by launchd/systemd)
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import queue
+import socket
 import sys
 import threading
 import time
@@ -35,6 +44,10 @@ from iphone.transport import FridaTouch              # noqa: E402
 from vision import TemplateLibrary, find_template, ocr_region, parse_shield_countdown  # noqa: E402
 
 log = logging.getLogger("bubbler.agent")
+
+# Reported on every long-poll (cloud stamps it into agent_health so the dashboard can
+# tell a healthy phone from a silent one; bump on game-flow or heartbeat contract change).
+__version__ = "0.3.0"
 
 
 class ConfiguredVision:
@@ -188,11 +201,23 @@ class CloudClient:
             self._local.session = session
         return session
 
-    def next_event(self, hold: int) -> dict | None:
-        """One long-poll round. Returns the event dict or None (held empty)."""
+    def next_event(self, hold: int, meta: dict | None = None) -> dict | None:
+        """One long-poll round. Returns the event dict or None (held empty).
+
+        `meta` ({version, host, pid}) rides the query string so the cloud can stamp the
+        heartbeat (GET /api/agent/events -> lib/agentHealth) on this agent's identity.
+        """
+        params = {"hold": hold}
+        if meta:
+            if meta.get("version"):
+                params["v"] = meta["version"]
+            if meta.get("host"):
+                params["host"] = meta["host"]
+            if meta.get("pid"):
+                params["pid"] = meta["pid"]
         r = self._http().get(
             f"{self.base_url}/api/agent/events",
-            params={"hold": hold},
+            params=params,
             timeout=self.timeout + 5,
         )
         r.raise_for_status()
@@ -340,10 +365,13 @@ _test_lock = threading.Lock()
 
 
 def run_test(cloud: CloudClient, event: dict, evony: EvonyController, bundle_id: str) -> None:
-    """Open Evony on the phone, sign in as the member's email, then report back.
+    """"Test connection": open Evony, sign in as the member's email and verify identity.
 
-    A persisted device session logs in with just the email typed (no one-time code).
-    If Evony asks for a fresh 6-digit code instead, report a re-link hint rather than ok.
+    Reuses the proven link credentials path (launch login screen -> type email -> confirm).
+    A persisted device session skips the 6-digit code and shows the "login as Player X?"
+    prompt; the agent reads the name there (when vision/OCR is calibrated), refuses to
+    confirm if it does not match the member's evony_name, then reaches the profile and
+    reports the confirmed name. See evony.EvonyController.test_login.
     """
     test_id = (event.get("payload") or {}).get("test_id")
     if not test_id:
@@ -352,23 +380,20 @@ def run_test(cloud: CloudClient, event: dict, evony: EvonyController, bundle_id:
     if not _test_lock.acquire(blocking=False):
         log.warning("test already running; ignoring %s", test_id)
         return
+    email = event.get("email", "")
+    expected_name = event.get("evony_name", "") or ""
     result = {"status": "failed", "error": "test did not start"}
     try:
         _safe_test_report(cloud, test_id, {"status": "running"})
-        evony.open_evony(bundle_id)
-        state = None
-        for _ in range(15):
-            state = evony.to_world_view(event.get("email", ""))
-            if state in ("world", "needs_code"):
-                break
-            time.sleep(2)
-        if state == "world":
+        flow = evony.test_login(email, expected_name, bundle_id=bundle_id)
+        if flow.get("status") == "ok":
             result = {"status": "ok"}
-        elif state == "needs_code":
-            result = {"status": "failed",
-                      "error": "session revoked or new device — re-link from the wizard"}
+            confirmed = flow.get("confirmed_name")
+            if confirmed:
+                result["confirmed_name"] = confirmed
+                result["verified"] = bool(flow.get("verified", False))
         else:
-            result = {"status": "failed", "error": "could not reach the game screen"}
+            result = {"status": "failed", "error": flow.get("error")}
     except Exception as exc:
         log.warning("test %s failed: %s", test_id, exc)
         result = {"status": "failed", "error": str(exc)[:200]}
@@ -475,18 +500,45 @@ def main() -> None:
     cloud, evony = make_components(cfg)
     relay = CodeRelay()
     poll_ms = int(cfg.get("runner", {}).get("poll_interval_ms", 3000))
+    cloud_cfg = cfg.get("cloud", {}) or {}
+    # Watchdog knobs: the supervisor (launchd/systemd) runs us with Restart/KeepAlive, so
+    # giving up here is a *relaunch recovery*, not a shutdown (docs/06).
+    max_idle = int(cloud_cfg.get("max_idle_sec", 300))
+    max_failures = int(cloud_cfg.get("max_failures", 8))
 
-    log.info("agent started (cloud=%s)", cfg["cloud"]["base_url"])
+    meta = {
+        "version": __version__,
+        "host": socket.gethostname(),
+        "pid": os.getpid(),
+    }
+    log.info("agent %s started (cloud=%s, host=%s)", __version__, cfg["cloud"]["base_url"], meta["host"])
+
+    # A healthy loop completes a poll round every ~46s (45s hold + reconnect). We exit if
+    # nothing rounds in `max_idle` seconds (a stuck transport/sync flow) or after too many
+    # consecutive cloud failures, so launchd/systemd relaunch a fresh process.
+    last_activity = time.monotonic()
+    consecutive_failures = 0
     while True:
+        if time.monotonic() - last_activity > max_idle:
+            log.error("no successful poll round for %ss; exiting for supervisor", max_idle)
+            sys.exit(1)
         try:
-            event = cloud.next_event(45)
+            event = cloud.next_event(45, meta=meta)
         except requests.RequestException as exc:
+            consecutive_failures += 1
             log.warning("long-poll failed (%s); reconnecting in %ss", exc, poll_ms // 1000)
+            if consecutive_failures >= max_failures:
+                log.error("cloud unreachable for %s consecutive polls; exiting for supervisor",
+                          consecutive_failures)
+                sys.exit(1)
             time.sleep(poll_ms // 1000)
             continue
+        consecutive_failures = 0
+        last_activity = time.monotonic()
 
         if event:
             handle_event(cloud, evony, relay, event, cfg, wait_link=args.once)
+            last_activity = time.monotonic()
         if args.once:
             break
 

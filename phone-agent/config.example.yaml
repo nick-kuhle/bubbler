@@ -4,6 +4,8 @@
 cloud:
   base_url: https://bubbler.vercel.app
   agent_token: ""          # long-lived bearer, minted by the master
+  max_idle_sec: 300        # watchdog: exit if no poll round completes for this long
+  max_failures: 8          # watchdog: exit after this many consecutive cloud poll failures
 
 phone:
   evony_bundle_id: com.topgamesinc.evony   # UPDATE once installed; capture via ideviceinstaller

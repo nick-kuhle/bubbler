@@ -56,7 +56,9 @@ there is only one consumer.
    until dependencies, local services, config and calibration are ready.
 5. Finish the 3-day truce calibration/vision/run tests and the skip/failed-run/re-link
    paths before enabling unattended schedules. The successful Evony link test proves
-   none of these. Add a last-seen/alert mechanism so an offline phone is noticed.
+   none of these. A heartbeat (`agent_health`, surfaced on the dashboard and War Room) is
+   implemented, but an **outbound alert** (email/push/banner) for an offline phone is not —
+   an operator must still look at the status card. Finish the alert for steady-state.
 
 These are **open gates**, not claims that this PR has implemented them.
 

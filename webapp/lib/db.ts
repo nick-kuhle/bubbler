@@ -146,14 +146,28 @@ const MIGRATIONS: string[] = [
      created_at TEXT NOT NULL,
      expires_at TEXT NOT NULL
    )`,
-  `CREATE TABLE IF NOT EXISTS test_sessions (
+`CREATE TABLE IF NOT EXISTS test_sessions (
      id TEXT PRIMARY KEY,
      user_id TEXT NOT NULL REFERENCES users(id),
      state TEXT NOT NULL,
      error TEXT,
+     confirmed_name TEXT,
+     verified INTEGER,
      created_at TEXT NOT NULL,
      expires_at TEXT NOT NULL
-   )`,
+    )`,
+   // Agent liveness: the phone stamps this row on every authenticated long-poll
+   // (GET /api/agent/events). The dashboard alarms on it; see docs/06. `main` is the
+   // single device in the current deployment; keyed so a second agent can coexist later.
+   `CREATE TABLE IF NOT EXISTS agent_health (
+     agent_id TEXT PRIMARY KEY,
+     last_seen_at TEXT NOT NULL,
+     last_event_at TEXT,
+     version TEXT,
+     hostname TEXT,
+     pid INTEGER,
+     updated_at TEXT NOT NULL
+    )`,
   `CREATE TABLE IF NOT EXISTS jobs (
      id TEXT PRIMARY KEY,
      kind TEXT NOT NULL,
@@ -181,7 +195,28 @@ const MIGRATIONS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_runs_user ON runs(user_id, created_at)`,
 ];
 
+/** Column-adds for tables that predate a new column (migrations are idempotent).
+ * Postgres and modern SQLite both accept plain ADD COLUMN; a duplicate is swallowed so
+ * re-running the build on an already-migrated DB is a no-op. */
+const COLUMN_ADDITIONS: Array<{ sql: string; col: string }> = [
+  {
+    col: "test_sessions.confirmed_name",
+    sql: `ALTER TABLE test_sessions ADD COLUMN confirmed_name TEXT`,
+  },
+  {
+    col: "test_sessions.verified",
+    sql: `ALTER TABLE test_sessions ADD COLUMN verified INTEGER`,
+  },
+];
+
 export async function migrate(): Promise<void> {
   const d = db();
   for (const m of MIGRATIONS) await d.run(m);
+  for (const { sql, col } of COLUMN_ADDITIONS) {
+    try {
+      await d.run(sql);
+    } catch {
+      // column already exists — idempotent re-run
+    }
+  }
 }

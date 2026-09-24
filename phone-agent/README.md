@@ -14,9 +14,27 @@ evony.py             in-game link + bubble orchestration
 vision.py            template/OCR helpers (requires device calibration)
 iphone/transport.py  ZXTouch + Frida support; currently has laptop-test SSH fallback
 config.example.yaml  config template (no secrets)
-bootstrap/           LaunchDaemon plist + installer (needs staging-order fix)
+bootstrap/           LaunchDaemon plist + installer, systemd unit + tunnel helpers
 calibration/         JSON tap/ROI manifest; real image templates are git-ignored
 ```
+
+## Heartbeat and relaunch
+
+Every authenticated long-poll stamps `agent_health` on the cloud, tagged with the agent's
+`v`/`host`/`pid` (GET /api/agent/events -> webapp `lib/agentHealth.ts`). A phone that
+stops polling is "offline" there within ~2 minutes — the dashboard Test connection card
+and the War Room show it instead of spinning silently (docs/06).
+
+The loop also **self-exits** when the cloud is unreachable for `cloud.max_failures`
+consecutive polls or no poll round completes within `cloud.max_idle_sec`. Any supervisor
+then relaunches a fresh process:
+- **On the phone (target):** `bootstrap/com.bubbler.agent.plist` (KeepAlive) via
+  `bootstrap/install.sh`.
+- **On the laptop (testing/calibrating):** `bootstrap/bubbler-agent.service` (systemd
+  Restart=always) after `bootstrap/start_tunnels.sh` opened the Frida/ZXTouch tunnels.
+
+Only **one** agent consumes the queue at a time — a laptop and a phone agent poll-ping the
+same jobs. Whichever is live is the one that owns the heartbeat `main` row.
 
 ## On-device prerequisites (not yet verified by this review)
 
@@ -53,4 +71,7 @@ no jobs are pending, or it may claim a real job.
 For local development (not an always-on runtime), `python -m venv .venv` and
 `pip install -r requirements.txt` can exercise the agent loop, but this does not prove
 on-phone dependency compatibility. Do not run a laptop and phone agent against the same
-queue concurrently. See [06 — runbook](../docs/06-runbook.md) for checks and failures.
+queue concurrently. The `cloud.max_idle_sec`/`cloud.max_failures` watchdog knob acts like
+launchd KeepAlive/systemd Restart=always; leaving watchdog off means a hung process is
+invisible until the dashboard heartbeat flips to offline. See
+[06 — runbook](../docs/06-runbook.md) for checks and failures.

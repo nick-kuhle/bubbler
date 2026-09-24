@@ -1,8 +1,10 @@
 // app/api/master/route.ts — operator-only master list: every slot + run, latest first.
 // Per-slot model: each (day, time) row is listed separately — no weekdays mask.
+// Also embeds the phone agent heartbeat (agentHealth) so the War Room shows liveness.
 import { NextResponse } from "next/server";
 import { currentUser, unauthorized } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { agentHealth } from "@/lib/agentHealth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,5 +25,7 @@ export async function GET() {
        FROM runs r JOIN users u ON u.id = r.user_id
       ORDER BY r.created_at DESC LIMIT 50`,
   );
-  return NextResponse.json({ operator: op.evony_name, slots, runs });
+  const agent = await agentHealth();
+  const { agent_id: _agentId, ...agentStatus } = agent ?? { online: false, last_seen_at: null, last_event_at: null, version: null, hostname: null, pid: null, offline_for_ms: 0 };
+  return NextResponse.json({ operator: op.evony_name, slots, runs, agent: agentStatus });
 }

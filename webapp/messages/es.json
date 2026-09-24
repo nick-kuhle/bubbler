@@ -148,9 +148,22 @@
     "pending": "Esperando al teléfono…",
     "runningStatus": "Abriendo el juego en el teléfono e iniciando sesión como {email}…",
     "ok": "Conectado. El juego se abrió e inició sesión como {email}.",
+    "okName": "Conectado. Sesión iniciada como {name} — eres tú.",
+    "okUnverified": "Conectado — se inició sesión en la cuenta de este correo, pero el teléfono aún no puede leer el nombre en el juego (visión/calibración desactivada).",
     "failed": "No se pudo completar la prueba.",
     "expired": "Sin respuesta del teléfono. ¿Está activo el agente del dispositivo?",
+    "agentOffline": "El agente del teléfono está sin conexión — el teléfono no puede responder hasta que vuelva.",
     "startError": "No se pudo iniciar la prueba."
+  },
+  "agentStatus": {
+    "title": "Agente del teléfono",
+    "online": "en línea",
+    "offline": "sin conexión",
+    "never": "nunca se ha conectado",
+    "lastSeen": "última señal hace {ago}",
+    "version": "v{v}",
+    "lastClaimed": "recibió un trabajo hace {ago}",
+    "now": "justo ahora"
   },
   "info": {
     "title": "Cómo funciona",

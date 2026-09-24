@@ -63,7 +63,7 @@ export async function claimNext(): Promise<BubblerEvent | null> {
       WHERE j.status = 'pending' AND (j.expires_at IS NULL OR j.expires_at > ?)
       ORDER BY j.created_at LIMIT 1`,
     [nowIso()],
-  )) as (Row & { job_id: string; kind: "run" | "link" | "code"; user_id: string; email: string; evony_name: string; payload: string }) | undefined;
+  )) as (Row & { job_id: string; kind: "run" | "link" | "code" | "test"; user_id: string; email: string; evony_name: string; payload: string }) | undefined;
   if (!row) return null;
   await d.run("UPDATE jobs SET status = 'claimed' WHERE id = ?", [row.job_id]);
   const payload = JSON.parse(row.payload || "{}") as Record<string, unknown>;

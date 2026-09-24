@@ -1,0 +1,20 @@
+[Unit]
+Description=bubbler phone agent (long-poll + Evony controller, laptop mode)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Laptop mode: run from the repo checkout with the SSH tunnels open first
+# (phone-agent/bootstrap/start_tunnels.sh), then `systemctl start bubbler-agent`.
+# When the agent moves fully onto the phone, use the LaunchDaemon instead.
+WorkingDirectory=/home/nickkuhle/Work/bubbler/phone-agent
+ExecStart=/usr/bin/env python3 agent.py --config config.yaml
+Restart=always
+RestartSec=5
+# Belt and braces: the agent also self-exits on stall so Restart=always gets a clean
+# process; a bounded stop keeps a hung run from holding shutdown.
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

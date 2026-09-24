@@ -38,18 +38,20 @@ Use distinct staging and production environments and keep all values out of Git/
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/agent/events?hold=45` | Phone-initiated long-poll, returns `{ok,event}`; auth bearer |
+| `GET` | `/api/agent/events?hold=45` | Phone-initiated long-poll, returns `{ok,event}`; stamps the heartbeat from `v`/`host`/`pid`; auth bearer |
+| `GET` | `/api/agent/status` | Phone agent liveness (online / last seen / version) for the Test connection card; web session |
 | `POST` | `/api/agent/links/{link_id}/status` | Phone reports wizard link progress; auth bearer |
 | `POST` | `/api/agent/runs` | Phone reports a run; auth bearer |
 | `POST` | `/api/agent/runs/{run_id}/evidence` | Raw PNG/JPEG to Blob; auth bearer |
 | `POST` | `/api/wizard/link`, `/api/wizard/link/{link_id}/code` | Start link / submit Evony code; web session |
 | `GET` | `/api/wizard/link/{link_id}` | Browser polls link status (about every 3s); web session |
 | `POST` | `/api/test-connection` | Start a connection test (opens Evony on the phone, signs in as the member's email); web session |
-| `GET` | `/api/test-connection/{test_id}` | Browser polls test status (about every 2s); web session |
-| `POST` | `/api/agent/test-connection/{test_id}/status` | Phone reports test progress (running/ok/failed); auth bearer |
+| `GET` | `/api/test-connection/{test_id}` | Browser polls test status; includes the confirmed in-game name and `agent_online`; web session |
+| `POST` | `/api/agent/test-connection/{test_id}/status` | Phone reports test progress (running/ok/failed + `confirmed_name`/`verified`); auth bearer |
 | `POST` | `/api/runs/now`, `/api/schedule` | Queue a manual run / manage slots; web session |
 
 Data tables are `users`, `sessions`, `slots` (one UTC weekday/time per row),
-`link_sessions`, `jobs` and `runs`. There is no `/jobs/due` endpoint or separate
+`link_sessions`, `test_sessions`, `agent_health` (heartbeat), `jobs` and `runs`. There is
+no `/jobs/due` endpoint or separate
 `schedules`/`re_link` table in the current implementation. Jobs are currently marked
 `claimed` without a lease/retry; see cutover gates before relying on unattended work.

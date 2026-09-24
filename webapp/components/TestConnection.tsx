@@ -8,11 +8,20 @@ type Props = { dict: Dict; email: string };
 type TestState =
   | { kind: "idle" }
   | { kind: "starting" }
-  | { kind: "active"; id: string; server: "pending" | "running" }
-  | { kind: "ok"; email: string }
+  | { kind: "active"; id: string; server: "pending" | "running"; agentOnline: boolean }
+  | { kind: "ok"; confirmed: string | null; verified: boolean }
   | { kind: "failed"; error: string }
   | { kind: "expired" }
   | { kind: "error" };
+
+type PollData = {
+  ok: boolean;
+  state?: string;
+  error?: string | null;
+  confirmed_name?: string | null;
+  verified?: boolean | null;
+  agent_online?: boolean;
+};
 
 export default function TestConnection({ dict, email }: Props) {
   const d = dict.test;
@@ -31,7 +40,7 @@ export default function TestConnection({ dict, email }: Props) {
         setT({ kind: "error" });
         return;
       }
-      setT({ kind: "active", id: String(data.test_id), server: "pending" });
+      setT({ kind: "active", id: String(data.test_id), server: "pending", agentOnline: true });
     } catch {
       setT({ kind: "error" });
     }
@@ -39,7 +48,7 @@ export default function TestConnection({ dict, email }: Props) {
 
   useEffect(() => {
     if (t.kind !== "active") return;
-    const { id, server } = t;
+    const { id, server, agentOnline } = t;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
 
@@ -47,13 +56,16 @@ export default function TestConnection({ dict, email }: Props) {
       if (cancelled) return;
       try {
         const r = await fetch(`/api/test-connection/${id}`, { cache: "no-store" });
-        const data = (await r.json().catch(() => ({}))) as { state?: string; error?: string | null };
+        const data = (await r.json().catch(() => ({}))) as PollData;
         const s = data.state;
-        if (s === "ok") setT({ kind: "ok", email });
+        if (s === "ok") setT({ kind: "ok", confirmed: data.confirmed_name ?? null, verified: data.verified === true });
         else if (s === "failed") setT({ kind: "failed", error: data.error ?? "" });
         else if (s === "expired") setT({ kind: "expired" });
-        else if ((s === "pending" || s === "running") && server !== s) {
-          setT({ kind: "active", id, server: s });
+        else if (s === "pending" || s === "running") {
+          const agentOnlineNow = data.agent_online !== false;
+          if (server !== s || agentOnlineNow !== agentOnline) {
+            setT({ kind: "active", id, server: s, agentOnline: agentOnlineNow });
+          }
         }
       } catch {
         // transient fetch failure — keep polling
@@ -82,13 +94,22 @@ export default function TestConnection({ dict, email }: Props) {
         </button>
       </div>
 
+      {t.kind === "active" && !t.agentOnline && (
+        <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d.agentOffline}</p>
+      )}
       {t.kind === "active" && (
         <p className="wizard-status">
           <span className="spin" aria-hidden />
           {t.server === "running" ? d.runningStatus.replace("{email}", email) : d.pending}
         </p>
       )}
-      {t.kind === "ok" && <p className="ok" style={{ margin: "0.6rem 0 0" }}>{d.ok.replace("{email}", email)}</p>}
+      {t.kind === "ok" && (
+        <p className="ok" style={{ margin: "0.6rem 0 0" }}>
+          {t.verified && t.confirmed
+            ? d.okName.replace("{name}", t.confirmed)
+            : d.okUnverified}
+        </p>
+      )}
       {t.kind === "failed" && (
         <p className="warn" style={{ margin: "0.6rem 0 0" }}>
           {d.failed}

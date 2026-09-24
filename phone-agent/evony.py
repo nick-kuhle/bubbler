@@ -4,6 +4,8 @@
         -> report (success | failed | expired) -> force-close Evony
   link: launch -> email login -> type email -> send code -> post awaiting_phone/awaiting_code
         -> wait for code event -> type code -> post linked/failed/expired -> force-close
+  test: launch -> email login -> type email -> "login as Player X?" -> verify the name
+        (OCR, refuse on mismatch) -> confirm -> profile double-check -> force-close
 
 The vision layer (see vision.py) does screen-truth guards against the calibration templates
 in calibration/. Until calibration images exist the agent runs in *no-verify* mode: it
@@ -438,6 +440,174 @@ class EvonyController:
             self.tap("code_dialog", "resend")       # fresh code + fresh 90s window
         except CalibrationMissing:
             log.warning("resend tap not calibrated; relying on user retrigger")
+
+    # -- test-connection flow -------------------------------------------
+    def test_login(self, email: str, expected_name: str,
+                   bundle_id: str | None = None) -> dict:
+        """Non-interactive "Test connection" sign-in.
+
+        Mirrors link_login's credentials path (launch login screen -> type email ->
+        confirm) but, with a persisted device session, Evony skips the 6-digit code and
+        shows the "login as Player X?" parchment. Identity is confirmed on that prompt:
+        the name is OCR'd (when the operator has calibrated `login_prompt.name_roi`) and
+        we REFUSE to tap Login if it doesn't match the member's evony_name. Afterwards
+        the profile is double-checked when a `profile` screen is calibrated.
+
+        Returns {"status": "ok" | "failed", "error"?, "confirmed_name"?, "verified": bool}.
+        """
+        try:
+            if not self.launch_login_screen(bundle_id):
+                return {"status": "failed", "error": "switch account dialog did not appear"}
+            if not email or "@" not in str(email):
+                return {"status": "failed", "error": "test has no email"}
+            log.info("dialog up; waiting before email")
+            time.sleep(1.8)
+            log.info("entering email (len=%d)", len(email))
+            self._enter_email(email)
+            return self._finish_test_login(expected_name or "")
+        except CalibrationMissing as extra:
+            return {"status": "failed", "error": f"calibration: {extra}"}
+
+    def _finish_test_login(self, expected_name: str) -> dict:
+        prompt_name: str | None = None
+        state = self._post_email_state(20.0)
+        if state == "needs_code":
+            return {"status": "failed",
+                    "error": "session revoked or new device — re-link from the wizard"}
+        if state == "login_prompt":
+            matched, prompt_name = self._accept_login_prompt(expected_name)
+            if not matched:
+                return {"status": "failed",
+                        "error": f"login would reach a different account: {prompt_name or 'unknown'}"}
+            if not self._wait_parchment_gone(25.0):
+                return {"status": "failed", "error": "login confirm did not complete"}
+        elif state == "world":
+            log.info("already on the world view after email confirm")
+        elif state == "unknown":
+            return {"status": "failed",
+                    "error": "could not reach the Evony login result after email confirm"}
+        else:  # pragma: no cover — exhaustive
+            return {"status": "failed", "error": "unexpected post-email state"}
+
+        # Post-login identity double-check: open the profile and read the name.
+        verified = state == "login_prompt" and bool(prompt_name)
+        profile = self._profile_verification(expected_name, verified)
+        confirmed = profile.get("confirmed_name") or prompt_name or None
+        result = {"status": "ok", "verified": bool(profile.get("verified", verified))}
+        if confirmed:
+            result["confirmed_name"] = confirmed
+        err = profile.get("error")
+        if err:
+            # Profile confirmed a *different* account: we are on the wrong profile.
+            result = {"status": "failed", "error": err}
+        return result
+
+    def _post_email_state(self, timeout: float = 20.0) -> str:
+        """After typing email + confirm: 'needs_code' | 'login_prompt' | 'world' | 'unknown'."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            img = self._grab()
+            if img is None:
+                time.sleep(1.0)
+                continue
+            if self._code_dialog_visible():
+                log.info("test: code dialog appeared (session revoked or fresh device)")
+                return "needs_code"
+            if self._is_switch_account(img):
+                log.info("test: 'login as Player X?' parchment visible")
+                return "login_prompt"
+            if self.on_screen("world_view"):
+                return "world"
+            time.sleep(1.0)
+        log.warning("test: no known post-email state within %ss", timeout)
+        return "unknown"
+
+    def _prompt_name(self) -> str | None:
+        """Read the account name from the "login as Player X?" parchment, or None."""
+        if not self.v or not self.cal:
+            return None
+        spec = self.cal.screens.get("login_prompt") or {}
+        roi = spec.get("name_roi")
+        if not roi or len(roi) != 4:
+            return None
+        try:
+            shot = self.t.screenshot()
+            text = self.v.ocr_region(shot, tuple(int(v) for v in roi))
+        except Exception as exc:
+            log.warning("prompt-name OCR failed: %s", exc)
+            return None
+        return text.strip() or None
+
+    def _accept_login_prompt(self, expected_name: str) -> tuple[bool, str | None]:
+        """OCR the prompt's name; tap Login only when it matches, else refuse."""
+        prompt_name = self._prompt_name()
+        if prompt_name is None:
+            # No vision/ROI: the prompt is for the typed email's own account, so the
+            # login is safe, but we cannot *verify* the name yet — report verified=false.
+            log.warning("cannot read the login-prompt name (vision/calibration off); "
+                        "proceeding unverified")
+            self._confirm_load_account()
+            return True, None
+        if _names_match(prompt_name, expected_name):
+            log.info("login prompt name '%s' matches expected '%s'", prompt_name, expected_name)
+            self._confirm_load_account()
+            return True, prompt_name
+        log.warning("login prompt name '%s' does NOT match expected '%s'; refusing",
+                    prompt_name, expected_name)
+        return False, prompt_name
+
+    def _wait_parchment_gone(self, timeout: float = 25.0) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            img = self._grab()
+            if img is None:
+                time.sleep(1.0)
+                continue
+            if not self._is_switch_account(img):
+                return True
+            time.sleep(1.5)
+        log.warning("load-account parchment still visible after %ss", timeout)
+        return False
+
+    def _profile_verification(self, expected_name: str,
+                              fallback_verified: bool) -> dict:
+        """Open the profile and OCR its name as a post-login double-check.
+
+        Skipped (fallback only) until the operator calibrates a `profile` screen with a
+        `profile_button` tap and a `name_roi` on THIS phone (docs/04, calibration README).
+        """
+        if not self.cal or "profile" not in self.cal.screens:
+            return {"verified": fallback_verified}
+        spec = self.cal.screens["profile"]
+        button = (spec.get("taps") or {}).get("profile_button")
+        roi = spec.get("name_roi")
+        if not button or not roi or len(roi) != 4:
+            return {"verified": fallback_verified}
+        if not self.v:
+            return {"verified": fallback_verified}
+        try:
+            self.tap("profile", "profile_button")
+            time.sleep(2.2)
+            shot = self.t.screenshot()
+            text = (self.v.ocr_region(shot, tuple(int(v) for v in roi)) or "").strip()
+        except Exception as exc:
+            log.warning("profile verification failed: %s", exc)
+            return {"verified": fallback_verified}
+        if not text:
+            return {"verified": fallback_verified}
+        if _names_match(text, expected_name):
+            log.info("profile name '%s' matches expected '%s'", text, expected_name)
+            return {"verified": True, "confirmed_name": text}
+        return {"verified": False, "confirmed_name": text,
+                "error": f"profile shows a different account: {text}"}
+
+
+def _names_match(a: str | None, b: str | None) -> bool:
+    """Case/format-insensitive name equality (ignores the font's spacing/punctuation)."""
+    def norm(s) -> str:
+        return "".join(ch.lower() for ch in str(s or "") if ch.isalnum())
+    x, y = norm(a), norm(b)
+    return bool(x) and x == y
 
 
 def _best_shot(evony: EvonyController):

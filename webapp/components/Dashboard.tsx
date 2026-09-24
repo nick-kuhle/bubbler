@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, type Dict } from "@/lib/i18n";
 import UnlinkButton from "@/components/UnlinkButton";
 import TestConnection from "@/components/TestConnection";
+import AgentStatus from "@/components/AgentStatus";
 import { GEMS_72H } from "@/lib/i18n";
 import SlotsEditor, {
   EditSlot,
@@ -358,6 +359,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
       </section>
 
       <TestConnection dict={dict} email={me.user.email} />
+      <AgentStatus dict={dict} />
 
       <section className="card">
         <div className="hsplit" style={{ marginBottom: "0.6rem" }}>

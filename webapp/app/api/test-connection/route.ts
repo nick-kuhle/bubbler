@@ -26,7 +26,9 @@ export async function POST(_req: NextRequest) {
   await d.run(
     `INSERT INTO jobs (id, kind, user_id, payload, status, created_at, expires_at)
      VALUES (?, 'test', ?, ?, 'pending', ?, ?)`,
-    [nid(), user.id, JSON.stringify({ test_id: testId, email: user.email }), nowIso(), addMinutesIso(TEST_TTL_MINUTES)],
+    [nid(), user.id,
+     JSON.stringify({ test_id: testId, email: user.email, evony_name: user.evony_name }),
+     nowIso(), addMinutesIso(TEST_TTL_MINUTES)],
   );
   return NextResponse.json({ ok: true, test_id: testId });
 }

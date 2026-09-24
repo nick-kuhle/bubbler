@@ -10,10 +10,30 @@ type MasterData = {
     evony_name: string; active: number;
   }>;
   runs: Array<{ kind: string; status: string; shield_hours_remaining: number | null; created_at: string; evony_name: string }>;
+  agent: {
+    online: boolean; last_seen_at: string | null; last_event_at: string | null;
+    version: string | null; hostname: string | null; offline_for_ms: number;
+  };
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const dayName = (weekday: number): string => DAYS[weekday - 1] ?? String(weekday);
+
+function ago(ms: number): string {
+  if (!Number.isFinite(ms)) return "—";
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+function agentSince(ts: string | null): string {
+  if (!ts) return "never";
+  const ms = Date.now() - Date.parse(ts);
+  return ms < 45_000 ? "just now" : `${ago(ms)} ago`;
+}
 
 function tone(status: string): string {
   const s = status.toLowerCase();
@@ -69,6 +89,26 @@ export default function Master() {
       </section>
 
       <div style={{ display: "grid", gap: "1rem" }}>
+        <section className="card">
+          <div className="hsplit">
+            <h3>phone agent</h3>
+            <span className={`badge ${data.agent?.online ? "ok" : "warn"}`}>
+              {data.agent?.online ? "online" : "offline"}
+            </span>
+          </div>
+          <p className="muted" style={{ margin: "0.3rem 0 0" }}>
+            last seen {data.agent ? agentSince(data.agent.last_seen_at) : "never"}
+            {data.agent?.version ? ` · v${data.agent.version}` : ""}
+            {data.agent?.hostname ? ` · ${data.agent.hostname}` : ""}
+            {data.agent ? ` · last job ${agentSince(data.agent.last_event_at)}` : ""}
+          </p>
+          {data.agent && !data.agent.online && (
+            <p className="warn" style={{ margin: "0.4rem 0 0" }}>
+              silent for {ago(data.agent.offline_for_ms)} — no heartbeat, check the phone (docs/06).
+            </p>
+          )}
+        </section>
+
         <section className="card">
           <h3>slots</h3>
           <table>

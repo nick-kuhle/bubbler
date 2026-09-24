@@ -83,9 +83,15 @@ phone-agent/             Python agent, Evony orchestration and transport (target
   new users and different emails.** The flow enters the code in Evony, completes the in-game
   account load, and the link succeeds. This is *Evony account linking*, not app email
   authentication. We have not repeated this test against a phone-only + Vercel deployment.
-- The agent loop and `/api/agent/events` long-poll path are implemented. **On-phone daemon,
-  WiFi-only operation, Vercel/managed-Postgres deployment and reboot recovery are not yet
-  verified.** The local machine is still part of the tested setup.
+- The agent loop and `/api/agent/events` long-poll path are implemented. The phone now
+  stamps a **heartbeat** (`agent_health`) on every poll; the dashboard Test connection card
+  and War Room show online/offline and the agent self-exits so its supervisor relaunches it.
+  The tested setup still runs the agent on a local machine (SSH tunnels to the phone);
+  **on-phone daemon, WiFi-only operation, Vercel/managed-Postgres deployment and reboot
+  recovery are not yet verified.**
+- "Test connection" signs in as the member's email and — once vision/calibration ROIs are
+  captured on the phone — verifies the in-game name on the "login as Player X?" prompt and
+  the profile before reporting "signed in as {name}".
 - Scheduled bubble application, screenshot calibration and shield verification still need
   end-to-end tests before unattended use.
 - **Production blocker:** app sign-in currently creates a session for anyone who submits an

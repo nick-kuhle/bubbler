@@ -31,3 +31,22 @@ Required run targets still include `world_view`, `truce_3day`, `activate_confirm
 on-device OpenCV/OCR dependencies if enabled (`vision.enabled` defaults to `false` in
 `config.example.yaml`); on-device install and screenshot matching must be tested. See
 [game flow](../../docs/04-evony-flow.md) and [cutover checklist](../../docs/07-cutover.md).
+
+## Identity verification for "Test connection"
+
+`agent.py`'s test flow opens Evony, signs in as the member's email, reaches the "login as
+Player X?" parchment (no code needed when the device session persists) and confirms the
+account. It then opens the profile as a double-check. To make that check authoritative
+(**verified=true**), capture two ROIs on THIS phone and add them to `calibration.json`:
+
+1. `login_prompt.name_roi` — the `[x, y, w, h]` box around the account name inside the
+   "login as Player X?" dialog. The agent refuses to log in when the OCR'd name does not
+   match the member's `evony_name`.
+2. `profile.profile_button` + `profile.name_roi` — the world-view tap that opens the
+   profile (top-left monarch/keep button) and the box around the name on the profile
+   screen (`taps: {"profile_button": {"x": .., "y": ..}}`).
+
+Until those are calibrated the agent still completes the sign-in (the email is the
+account's own) but reports `verified: false`, and the dashboard says so instead of
+pretending it confirmed the name. Add `"name_roi": [0, 0, 0, 0]`-free entries only after
+on-device capture; do not guess coordinates.

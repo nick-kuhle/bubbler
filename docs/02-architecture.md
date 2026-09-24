@@ -39,8 +39,10 @@ graph TD
   old `schedules` table).
 - Actual schema lives in `webapp/lib/db.ts` (not a `migrations/*.sql` file): `users`
   (plaintext email, Evony name, operator flag), `sessions` (hashed bearer/cookie token),
-  `slots` (weekday + time UTC, one row per slot), `link_sessions` (wizard state), `jobs`
-  (run/link/code payload + status), `runs` (result/evidence reference). Public evidence
+  `slots` (weekday + time UTC, one row per slot), `link_sessions` (wizard state),
+  `test_sessions` (connection-test state, including the confirmed in-game name), `jobs`
+  (run/link/code/test payload + status), `runs` (result/evidence reference),
+  `agent_health` (heartbeat: last seen / last event / version / host). Public evidence
   URLs use Vercel Blob; configure `BLOB_READ_WRITE_TOKEN` only when enabling evidence.
 - **Evony linking is not app authentication.** The former passed new-user/email tests; the
   current `/api/auth/login` immediately creates a session for an allowed email without
@@ -49,24 +51,34 @@ graph TD
 
 ## “Poor man's WebSocket”: actual long-poll contract
 
-1. The agent makes `GET /api/agent/events?hold=45` with a bearer token. The API calls
-   `fillDue()` and `claimNext()`, then checks roughly every **1.5 seconds** while holding
-   the request, up to the hold duration. No cron, WebSocket server or inbound phone port.
-   The endpoint declares a 60-second max function duration; verify actual Vercel plan and
-   edge/proxy timeouts in staging.
+1. The agent makes `GET /api/agent/events?hold=45` with a bearer token, also sending
+   `v`/`host`/`pid` so the cloud records agent `agent_health` (`lib/agentHealth.ts`). The
+   API calls `fillDue()` and `claimNext()`, then checks roughly every **1.5 seconds** while
+   holding the request, up to the hold duration. No cron, WebSocket server or inbound phone
+   port. The endpoint declares a 60-second max function duration; verify actual Vercel plan
+   and edge/proxy timeouts in staging.
 2. Due slots match the **current UTC minute**. `fillDue` inserts one job per user/date/time
    with a unique key to avoid repeated materialization in that minute; manual runs and new
    link/code jobs are inserted by their respective API routes.
 3. The response is `{ "ok": true, "event": null }` (empty hold) or an event with
    `job_id`, `kind`, `user_id`, `email`, `evony_name`, `payload`. Kinds: `run` (apply a
    truce), `link` (start Evony email login), `code` (6-digit code + link id), `test` (open
-   Evony on the phone, sign in as the member's email and report back). The agent
-   immediately polls again; the wizard browser polls link status every **3 seconds**.
+   Evony on the phone, sign in as the member's email, verify the in-game name on the
+   "login as Player X?" prompt and the profile, then report back). The agent immediately
+   polls again; the wizard browser polls link status every **3 seconds**.
    While healthy, events normally arrive quickly, but there is no guaranteed latency
    during outages or sleep.
 4. The agent reports link state to `POST /api/agent/links/{link_id}/status` or run results
    to `POST /api/agent/runs`, then optional evidence to
-   `POST /api/agent/runs/{run_id}/evidence`.
+   `POST /api/agent/runs/{run_id}/evidence`. Test results go to
+   `POST /api/agent/test-connection/{test_id}/status` (`running | ok | failed` plus
+   `confirmed_name` and `verified` when identity was read). Phone liveness is read through
+   `GET /api/agent/status` (any logged-in user) and is surfaced on the dashboard Test
+   connection card and the War Room.
+5. **Heartbeat = the agent's own polls.** A healthy agent touches `agent_health` every
+   ~46s, so "online" in `/api/agent/status` (within 120s of `last_seen`) is a real liveness
+   signal, not a manual probe. A manual `{event:null}` curl does **not** mean the phone is
+   alive or dead — it only reports that *that request* found no job.
 
 **Reliability gap (must fix before unattended operation):** `claimNext()` reads a pending
 job then updates it to `claimed` in separate queries, without an atomic claim/lease/ack.
@@ -78,10 +90,17 @@ these behaviors and test reconnect/resend before depending on autonomous schedul
 
 ## Phone agent
 
-- `phone-agent/agent.py`: HTTP long-poll loop and link/code relay; reports results.
+- `phone-agent/agent.py`: HTTP long-poll loop and link/code relay; reports results. It
+  sends `v`/`host`/`pid` with every poll (heartbeat) and **self-exits** when the cloud is
+  unreachable for `cloud.max_failures` consecutive polls or no poll round completes in
+  `cloud.max_idle_sec`, so launchd KeepAlive / systemd `Restart=always` relaunch a fresh
+  process instead of letting a hung transport go silently dark.
 - `phone-agent/evony.py`: Evony UI orchestration; the **link path has passed real tests** in
-  the current arrangement. 3-day truce navigation and vision-based verification still need
-  calibration and end-to-end tests.
+  the current arrangement. The **test path signs in as the member's email, reads the name on
+  the "login as Player X?" prompt, refuses to log in when it does not match, then
+  double-checks the profile** — with graceful degradation until the operator calibrates the
+  `name_roi`/`profile` regions and enables vision. 3-day truce navigation and vision-based
+  verification still need calibration and end-to-end tests.
 - `phone-agent/iphone/transport.py`: local ZXTouch input/screenshots and Frida support. It
   still contains a laptop-test fallback with a hard-coded SSH key path and LAN address;
   remove it in the on-device migration and test the phone's local `uiopen`/process-close

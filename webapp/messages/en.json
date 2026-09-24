@@ -148,9 +148,22 @@
     "pending": "Waiting for the phone…",
     "runningStatus": "Opening the game on the phone and signing in as {email}…",
     "ok": "Connected. The game opened and signed in as {email}.",
+    "okName": "Connected. Signed in as {name} — that's you.",
+    "okUnverified": "Connected — signed into the account behind this email, but the phone could not read the in-game name yet (vision/calibration is off).",
     "failed": "Couldn't complete the test.",
     "expired": "No response from the phone. Is the on-device agent running?",
+    "agentOffline": "The phone agent is offline — the phone can't respond until it's back.",
     "startError": "Couldn't start the test."
+  },
+  "agentStatus": {
+    "title": "Phone agent",
+    "online": "online",
+    "offline": "offline",
+    "never": "never heard from",
+    "lastSeen": "last heard {ago} ago",
+    "version": "v{v}",
+    "lastClaimed": "claimed a job {ago} ago",
+    "now": "just now"
   },
   "info": {
     "title": "How it works",

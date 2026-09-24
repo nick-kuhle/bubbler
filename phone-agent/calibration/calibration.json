@@ -41,6 +41,15 @@
         "9": {"x": 686, "y": 1474},
         "0": {"x": 414, "y": 1586}
       }
+    },
+    "login_prompt": {
+      "template": "login_prompt.png",
+      "taps": {
+        "confirm": {"x": 579, "y": 1100}
+      }
+    },
+    "profile": {
+      "template": "profile.png"
     }
   }
 }
