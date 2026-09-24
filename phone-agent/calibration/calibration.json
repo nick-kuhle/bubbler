@@ -44,12 +44,41 @@
     },
     "login_prompt": {
       "template": "login_prompt.png",
+      "note": "Same dialog as load_confirm (test-connection flow reads name_roi here).",
       "taps": {
         "confirm": {"x": 579, "y": 1100}
       }
     },
     "profile": {
       "template": "profile.png"
+    },
+    "load_confirm": {
+      "template": "load_confirm.png",
+      "note": "Last step of linked-account login: after Confirm on the email entry, Evony shows 'login as <user>' with a Confirm button (no 6-digit code). Taps verified from the link flow; drop a dialog crop as load_confirm.png to enable template matching.",
+      "taps": {
+        "confirm": {"x": 579, "y": 1100},
+        "cancel": {"x": 250, "y": 1100}
+      }
+    },
+    "world_view": {
+      "template": "world_view.png",
+      "note": "UNCALIBRATED: post-login world view. Capture with: python test_login.py --email <linked> --record-taps",
+      "taps": {}
+    },
+    "truce_3day": {
+      "template": "truce_3day.png",
+      "note": "UNCALIBRATED: 3-day Truce Agreement item (2500 gems) selection.",
+      "taps": {}
+    },
+    "activate_confirm": {
+      "template": "activate_confirm.png",
+      "note": "UNCALIBRATED: Activate + Confirm dialogs. Never tap-test confirm (spends 2500 gems).",
+      "taps": {}
+    },
+    "shield_active": {
+      "template": "shield_active.png",
+      "note": "UNCALIBRATED: shield indicator + countdown ROI for verification.",
+      "taps": {}
     }
   }
 }

@@ -80,18 +80,48 @@ class EvonyController:
         self.v = vision
         self.cal = calibration
         self._device_size: tuple[int, int] | None = None
+        # Optional hook(stage: str, png: bytes) used by test_login.py to save
+        # stage screenshots for login verification + bubble-tap calibration.
+        # The daemon path leaves it None (no extra screenshots taken).
+        self.shot_hook = None
+        # Detail of the most recent login_linked_account() call for run reports.
+        self.last_login: dict = {}
+
+    # -- debug screenshots ---------------------------------------------
+    def _snap(self, stage: str):
+        """Screenshot this stage when a shot_hook is installed, else no-op."""
+        if self.shot_hook is None:
+            return None
+        try:
+            shot = self.t.screenshot()
+        except Exception as exc:
+            log.warning("stage %s: screenshot failed: %s", stage, exc)
+            return None
+        try:
+            self.shot_hook(stage, shot)
+        except Exception as exc:
+            log.warning("stage %s: shot hook failed: %s", stage, exc)
+        return shot
 
     # -- guards --------------------------------------------------------
     def on_screen(self, name: str, screenshot: bytes | None = None) -> bool:
         """Truth-guard: are we on the named screen?"""
         if not self.cal or name not in self.cal.screens:
             return False
+        if self.v is None:
+            return False  # no-verify mode: template guards unavailable
         spec = self.cal.screens[name]
         template = spec.get("template")
         if not template:
             return False
-        screen = screenshot if screenshot else self.t.screenshot()
-        return self.v.find_template(screen, template) is not None
+        try:
+            screen = screenshot if screenshot else self.t.screenshot()
+        except Exception:
+            return False
+        try:
+            return self.v.find_template(screen, template) is not None
+        except Exception:
+            return False
 
     def device_xy(self, x: int, y: int) -> tuple[int, int]:
         # ZXTouch screenshots are 828x1792 — same as iOS screenshots. Do not scale.
@@ -114,26 +144,148 @@ class EvonyController:
         self.t.launch(bundle_id)
         time.sleep(settle)
 
-    def to_world_view(self, email: str) -> str:
-        """Return 'world' if we reach the world view, or 'needs_code' if stuck at a code
-        prompt, or 'failed'. Types the email if we land on the login screen."""
-        if self.on_screen("world_view"):
-            return "world"
-        if self.on_screen("code_dialog"):
-            return "needs_code"
-        if self.on_screen("email_login"):
-            self.tap_pair("email_login", "email")
-            self.t.type_text(email)
-            self.tap_pair("email_login", "continue")
-            time.sleep(2)
-            return "needs_code" if self.on_screen("code_dialog") else "world"
-        return "failed"
+    def to_world_view(self, email: str, bundle_id: str | None = None) -> str:
+        """Log in as `email` and return 'world', 'needs_code' or 'failed'.
+
+        Scheduled runs ALWAYS switch account via email, even if Evony looks
+        already logged in — the phone serves many users and the previous
+        session may belong to someone else. Detail lands in self.last_login.
+        """
+        res = self.login_linked_account(email, bundle_id=bundle_id)
+        return res.get("status", "failed")
+
+    # -- scheduled-run login (already-linked account, no code) ---------
+    def login_linked_account(
+        self,
+        email: str,
+        bundle_id: str | None = None,
+        post_email_timeout: float = 15.0,
+        world_timeout: float = 60.0,
+    ) -> dict:
+        """Log in as an already-linked user: launch -> loading-icon taps ->
+        type email -> Confirm -> tap the load-account Confirm (no 6-digit code).
+
+        Returns {status, error?} with status one of:
+          world      — reached the post-login world view, ready for bubble taps
+          needs_code — Evony asked for a 6-digit code: the device session was
+                       revoked ("Clear Other Devices" / new device). The run is
+                       reported `expired` and the user must re-link in the wizard.
+          failed     — anything else; `error` says what to check/fix.
+        """
+        self.last_login = {}
+        try:
+            if not self.launch_login_screen(bundle_id):
+                return self._login_result(
+                    "failed", "switch account dialog did not appear")
+            if not email or "@" not in str(email):
+                return self._login_result(
+                    "failed", "run event has no email")
+            log.info("dialog up; waiting before email")
+            time.sleep(1.8)
+            log.info("entering run email (len=%d)", len(email))
+            pre: dict = {}
+
+            def _snapshot_dialog():
+                pre["sig"] = self._dialog_signature(self._grab())
+
+            self._enter_email(email, after_type=_snapshot_dialog)
+            self._snap("post_email")
+
+            state = self._wait_for_post_email_state(post_email_timeout,
+                                                    pre.get("sig"))
+            log.info("post-email state: %s", state)
+            if state == "code":
+                return self._login_result(
+                    "needs_code",
+                    "Evony asked for a 6-digit code; session revoked, re-link required")
+            if state == "email":
+                # Confirm tap did not register; retry once before giving up.
+                log.info("still on email entry; retrying confirm tap")
+                pre["sig"] = self._dialog_signature(self._grab())
+                self.t.tap(579, 1100)
+                time.sleep(2.8)
+                self._snap("post_email_retry")
+                state = self._wait_for_post_email_state(post_email_timeout,
+                                                        pre.get("sig"))
+                log.info("post-email state after retry: %s", state)
+                if state == "code":
+                    return self._login_result(
+                        "needs_code",
+                        "Evony asked for a 6-digit code; session revoked, re-link required")
+                if state != "load":
+                    return self._login_result(
+                        "failed", "email confirm did not advance past email entry")
+            if state == "none":
+                # No dialog at all: Evony may be auto-loading straight to world.
+                if self._wait_for_world(20.0):
+                    self._snap("world")
+                    return self._login_result("world")
+                return self._login_result(
+                    "failed", "no confirmation dialog after email confirm")
+
+            # Linked path: load-account Confirm is the last step before login.
+            self._confirm_load_account()
+            self._snap("post_load_confirm")
+            time.sleep(3.0)
+            if self._code_dialog_visible():
+                return self._login_result(
+                    "needs_code",
+                    "Evony asked for a 6-digit code after load confirm; re-link required")
+            if self._wait_for_world(world_timeout):
+                self._snap("world")
+                return self._login_result("world")
+            if self._dialog_visible():
+                log.info("load-account dialog still up; tapping confirm again")
+                self._confirm_load_account()
+                if self._wait_for_world(30.0):
+                    self._snap("world")
+                    return self._login_result("world")
+            if self._code_dialog_visible():
+                return self._login_result(
+                    "needs_code",
+                    "Evony asked for a 6-digit code; session revoked, re-link required")
+            return self._login_result(
+                "failed", "world view not reached after load confirm")
+        except CalibrationMissing as exc:
+            return self._login_result("failed", f"calibration: {exc}")
+
+    def _login_result(self, status: str, error: str | None = None) -> dict:
+        res = {"status": status}
+        if error:
+            res["error"] = error
+        self.last_login = dict(res)
+        log.info("login result: %s%s", status, f" ({error})" if error else "")
+        return res
+
+    def missing_bubble_taps(self) -> list[str]:
+        """Names of bubble taps not yet calibrated, e.g. 'world_view/bubble_menu'."""
+        required = [
+            ("world_view", "bubble_menu"),
+            ("truce_3day", "select"),
+            ("activate_confirm", "activate"),
+            ("activate_confirm", "confirm"),
+        ]
+        missing = []
+        for screen, tap in required:
+            point = ((self.cal.screens.get(screen) or {}).get("taps", {})
+                     .get(tap)) if self.cal else None
+            if not point or point.get("x") is None or point.get("y") is None:
+                missing.append(f"{screen}/{tap}")
+        return missing
 
     def apply_3day_bubble(self) -> dict:
         """One bubble application pass on the world view. Returns a result dict.
 
         result keys: status(success/failed), shield_hours_remaining, screenshot, error
         """
+        missing = self.missing_bubble_taps()
+        if missing:
+            return {
+                "status": "failed",
+                "error": ("bubble taps not calibrated: " + ", ".join(missing)
+                          + ". Capture them with: python test_login.py --email <linked> "
+                            "--record-taps (see phone-agent/calibration/README.md)"),
+            }
         try:
             self.tap("world_view", "bubble_menu")
             time.sleep(1)
@@ -225,21 +377,48 @@ class EvonyController:
         raw = (spec.get("taps") or {}).get("email_button") or {"x": 50, "y": 248}
         return int(raw["x"]), int(raw["y"])
 
-    def _grab(self):
+    def _grab_raw(self):
         try:
-            shot = self.t.screenshot()
+            return self.t.screenshot()
         except Exception as exc:
             log.warning("screenshot failed: %s", exc)
             return None
+
+    def _grab_both(self):
+        """Return (raw_png_bytes, decoded PIL image) or (None, None)."""
+        shot = self._grab_raw()
+        if shot is None:
+            return None, None
         try:
             from PIL import Image
             img = Image.open(io.BytesIO(shot)).convert("RGB")
         except Exception as exc:
             log.warning("screenshot decode failed: %s", exc)
-            return None
+            return None, None
         if img.size[0] < 800 or img.size[1] < 1600:
+            return None, None
+        return shot, img
+
+    def _grab(self):
+        return self._grab_both()[1]
+
+    def _template_hit(self, shot: bytes | None, screen_name: str) -> bool | None:
+        """Template check when vision is enabled; None when unavailable.
+
+        Lets the operator drop dialog crops (e.g. the load-confirm screenshot)
+        into calibration/ as `load_confirm.png` / `code_dialog.png` to override
+        the pixel heuristics below.
+        """
+        if shot is None or self.v is None or not self.cal:
             return None
-        return img
+        spec = self.cal.screens.get(screen_name) or {}
+        tmpl = spec.get("template")
+        if not tmpl:
+            return None
+        try:
+            return self.v.find_template(shot, tmpl) is not None
+        except Exception:
+            return None
 
     def _is_splash(self, img) -> bool:
         hits = n = 0
@@ -308,7 +487,157 @@ class EvonyController:
             time.sleep(1.4)
         return False
 
-    def _enter_email(self, email: str) -> None:
+    # -- post-email dialog classification (scheduled-run login) --------
+    # After Confirm on the email entry, a linked account lands on the
+    # load-account Confirm (last step, no code); a revoked session lands on
+    # the 6-digit code dialog instead. Both share the parchment dialog chrome,
+    # so we classify with: red-cancel pixel + code-box pixels + a dialog
+    # content signature taken after typing, before the confirm tap.
+    def _parchment_present(self, img) -> bool:
+        rows_ok = rows = 0
+        for y in range(720, 1000, 16):
+            hits = n = 0
+            for x in range(160, 670, 10):
+                r, g, b = img.getpixel((x, y))
+                n += 1
+                parchment = (
+                    155 <= r <= 200 and 135 <= g <= 175 and 90 <= b <= 135
+                    and abs(r - g) <= 35 and (g - b) >= 20 and (r - b) >= 35
+                )
+                if parchment:
+                    hits += 1
+            rows += 1
+            if n and hits / n >= 0.5:
+                rows_ok += 1
+        return rows > 0 and (rows_ok / rows) >= 0.35
+
+    @staticmethod
+    def _red_cancel_present(img) -> bool:
+        cr, cg, cb = img.getpixel((250, 1100))
+        return cr > 70 and cr > cg + 30 and cg < 90
+
+    def _code_boxes_visible(self, img) -> bool:
+        """True when the six code input boxes look present (bright box faces
+        where parchment would otherwise be)."""
+        bright = 0
+        for x in (130, 241, 352, 463, 573, 684):
+            r, g, b = img.getpixel((x, 813))
+            if min(r, g, b) > 165 and b > 150:
+                bright += 1
+        return bright >= 4
+
+    def _email_field_visible(self, img) -> bool:
+        """True when ONE wide input box spans the email band — as opposed to
+        the six separate code boxes. Decided on the gaps between code-box
+        columns (x ≈ 186/297/408/519/629): bright gaps mean a continuous
+        field; parchment gaps mean separate boxes (or no field at all)."""
+        hits = n = 0
+        for y in range(795, 865, 6):
+            for x in (186, 297, 408, 519, 629):
+                for dx in (-3, 0, 3):
+                    r, g, b = img.getpixel((x + dx, y))
+                    n += 1
+                    if min(r, g, b) > 200:
+                        hits += 1
+        return n > 0 and (hits / n) >= 0.5
+
+    def _dialog_signature(self, img):
+        """Coarse content hash of the dialog region for before/after compare."""
+        if img is None:
+            return None
+        sig = []
+        for y in range(720, 1140, 30):
+            for x in range(160, 670, 34):
+                r, g, b = img.getpixel((x, y))
+                sig.append((r >> 4, g >> 4, b >> 4))
+        return sig
+
+    @staticmethod
+    def _sig_changed(before, after, threshold: float = 0.10) -> bool | None:
+        if not before or not after or len(before) != len(after):
+            return None
+        diff = sum(1 for a, b in zip(before, after) if a != b)
+        return (diff / len(before)) >= threshold
+
+    def _classify_post_email(self, raw, img, pre_sig) -> str:
+        """One poll: 'code' | 'load' | 'email' | 'none' | 'ambiguous'."""
+        if self._template_hit(raw, "code_dialog"):
+            return "code"
+        if self._template_hit(raw, "load_confirm"):
+            return "load"
+        if img is None:
+            return "ambiguous"
+        if not self._parchment_present(img):
+            return "none"
+        red = self._red_cancel_present(img)
+        boxes = self._code_boxes_visible(img)
+        changed = self._sig_changed(pre_sig, self._dialog_signature(img))
+        log.info("post-email poll: red=%s boxes=%s changed=%s",
+                 red, boxes, changed)
+        if boxes and not red:
+            return "code"  # strong code signature, independent of similarity
+        if changed is False:
+            return "email"  # dialog content identical: confirm tap missed
+        if red and changed:
+            return "load"
+        if red and not self._email_field_visible(img):
+            return "load"  # no pre-snapshot fallback: parchment+red, no input
+        if red:
+            return "email"
+        return "ambiguous"  # parchment, no red, no boxes (yet)
+
+    def _wait_for_post_email_state(self, timeout: float = 15.0,
+                                   pre_sig=None) -> str:
+        """Poll until the post-email screen settles.
+
+        Returns 'code' | 'load' | 'email' | 'none'. An ambiguous parchment
+        (no red cancel, no boxes yet) resolves to 'code' — the legacy
+        link-verified signature — because mis-tapping Confirm on a code
+        dialog is worse than reporting needs_code and re-linking.
+        """
+        deadline = time.monotonic() + timeout
+        last = "none"
+        while time.monotonic() < deadline:
+            raw, img = self._grab_both()
+            state = self._classify_post_email(raw, img, pre_sig)
+            if state in ("code", "load"):
+                return state
+            if state != "ambiguous":
+                last = state
+            elif last == "none":
+                last = "ambiguous"
+            time.sleep(1.4)
+        if last == "ambiguous":
+            log.info("post-email ambiguous parchment; treating as code dialog")
+            return "code"
+        return last
+
+    def _wait_for_world(self, timeout: float = 60.0) -> bool:
+        """True once the post-login world view looks reached: no splash, no
+        parchment dialog, for two consecutive polls (or a world_view template
+        hit when vision is enabled)."""
+        deadline = time.monotonic() + timeout
+        calm = 0
+        while time.monotonic() < deadline:
+            raw, img = self._grab_both()
+            if self._template_hit(raw, "world_view"):
+                log.info("world view confirmed by template")
+                return True
+            if img is not None and not self._is_splash(img) \
+                    and not self._parchment_present(img):
+                calm += 1
+                if calm >= 2:
+                    log.info("world view reached (no splash/dialog)")
+                    return True
+            else:
+                calm = 0
+            time.sleep(2.0)
+        return False
+
+    def _enter_email(self, email: str, after_type=None) -> None:
+        """Type the email and tap Confirm. `after_type` (optional hook) runs
+        after typing, before the confirm tap — the run login uses it to snapshot
+        the dialog so it can tell 'confirm missed' from 'advanced'."""
         log.info("tap email field")
         for n in range(1, 7):
             log.info("email field tap #%s", n)
@@ -322,6 +651,11 @@ class EvonyController:
         except Exception:
             pass
         time.sleep(1.2)
+        if after_type is not None:
+            try:
+                after_type()
+            except Exception as exc:
+                log.warning("after_type hook failed: %s", exc)
         log.info("tap confirm once")
         self.t.tap(579, 1100)
         time.sleep(2.8)
@@ -627,12 +961,17 @@ def run_one(evony: EvonyController, event: dict, bundle_id: str) -> dict:
     """
     result = {"status": "failed", "error": "run did not start"}
     try:
-        evony.open_evony(bundle_id)
-        state = evony.to_world_view(event.get("email", ""))
+        # to_world_view launches Evony itself and ALWAYS switches account to
+        # the event's email (the phone serves many users; whoever was logged
+        # in last may be someone else).
+        state = evony.to_world_view(event.get("email", ""), bundle_id=bundle_id)
+        detail = (evony.last_login or {}).get("error")
         if state == "needs_code":
-            result = {"status": "expired", "error": "session revoked or new device"}
+            result = {"status": "expired",
+                      "error": detail or "session revoked or new device"}
         elif state == "failed":
-            result = {"status": "failed", "error": "could not reach world view"}
+            result = {"status": "failed",
+                      "error": detail or "could not reach world view"}
         else:
             result = evony.apply_3day_bubble()
     finally:

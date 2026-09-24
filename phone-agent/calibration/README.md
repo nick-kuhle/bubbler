@@ -2,9 +2,11 @@
 
 **Status:** The operator has successfully linked new users and email addresses in the
 current setup. The committed `calibration.json` has link-related coordinates for an
-iPhone XR (828 × 1792); it has **no complete world view / 3-day truce / shield verification
-entries**. Image templates are intentionally git-ignored and must be copied to the phone
-securely. Working linking is not proof that unattended bubble runs are calibrated.
+iPhone XR (828 × 1792), plus the linked-login `load_confirm` taps (Confirm 579,1100 —
+same position as the link-verified email confirm) and **empty, clearly-marked stubs** for
+`world_view` / `truce_3day` / `activate_confirm` / `shield_active`. Image templates are
+intentionally git-ignored and must be copied to the phone securely. Working linking is
+not proof that unattended bubble runs are calibrated.
 
 On-device vision caveat: python wheels for `Pillow`/`cv2`/`pytesseract` are **not
 installable on this phone** (no iOS arm64 wheels; source builds fail). Until prebuilt
@@ -57,3 +59,32 @@ Until those are calibrated the agent still completes the sign-in (the email is t
 account's own) but reports `verified: false`, and the dashboard says so instead of
 pretending it confirmed the name. Add `"name_roi": [0, 0, 0, 0]`-free entries only after
 on-device capture; do not guess coordinates.
+## Testing the linked login + calibrating bubble taps
+
+On the phone, from the installed agent directory (`/var/jb/usr/libexec/bubbler/`):
+
+```sh
+# 1. Login test: logs in as an already-linked user (no code), saves one
+#    screenshot per stage into shots/ — inspect post_email, post_load_confirm
+#    and world before trusting the schedule.
+python3 test_login.py --email member@example.com
+
+# 2. Record the 3-day-bubble taps interactively (writes calibration.json,
+#    keeps a .bak). Only world_view/bubble_menu is ever tap-tested live —
+#    activate/confirm taps are typed, never tested (they spend 2500 gems).
+python3 test_login.py --email member@example.com --record-taps
+
+# 3. Full pass once taps exist: login + real bubble apply + verify.
+python3 test_login.py --email member@example.com --and-bubble
+```
+
+Laptop-safe checklist (validates config + manifest, touches no phone):
+
+```sh
+python3 test_login.py --dry-run --config config.example.yaml
+```
+
+Optional template overrides: crop the load-account Confirm dialog (and the code
+dialog) from a `shots/` capture and save them as `load_confirm.png` /
+`code_dialog.png` in the installed calibration directory. When `vision.enabled`
+is true, these override the pixel heuristics in run-login classification.
