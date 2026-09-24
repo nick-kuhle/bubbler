@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyBearer } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { nid, nowIso } from "@/lib/id";
+import { markJobDone } from "@/lib/scheduler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,5 +48,8 @@ export async function POST(req: NextRequest) {
       nowIso(),
     ],
   );
+  // A run has been performed and reported; retire its job so the 90s lease can't
+  // redeliver an already-finished run.
+  if (body.job_id) await markJobDone(String(body.job_id));
   return NextResponse.json({ ok: true, run_id: runId });
 }

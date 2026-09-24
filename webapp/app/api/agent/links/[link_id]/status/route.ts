@@ -5,13 +5,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyBearer } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { nowIso } from "@/lib/id";
+import { markJobDoneBySession } from "@/lib/scheduler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const ALLOWED = new Set(["awaiting_phone", "awaiting_code", "linked", "failed", "expired"]);
+const TERMINAL = new Set(["linked", "failed", "expired"]);
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ link_id: string }> }) {
   const agent = await verifyBearer(req);
@@ -27,5 +28,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lin
       WHERE id = ?`,
     [status, body.error ?? null, link_id],
   );
+
+  // Terminal outcomes end the job so a linked/failed/expired session is never reclaimed.
+  if (TERMINAL.has(status)) await markJobDoneBySession("link", link_id);
+
   return NextResponse.json({ ok: true });
 }

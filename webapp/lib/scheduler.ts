@@ -64,6 +64,73 @@ export async function fillDue(now: Date = new Date()): Promise<void> {
  */
 export const RECLAIM_AFTER_MS = 90_000;
 
+/**
+ * Report routes call this once a flow reaches a terminal outcome (test ok/failed,
+ * link linked/failed/expired, run reported) so the job can never be reclaimed again.
+ * A done job is invisible to claimNext (it only looks at pending / stale-claimed).
+ */
+export async function markJobDoneBySession(kind: "test" | "link", sessionId: string): Promise<void> {
+  // payload is JSON, e.g. {"test_id":"AbC123"}; session ids are base62, never wildcars.
+  await db().run(
+    `UPDATE jobs SET status = 'done'
+      WHERE kind = ? AND status IN ('pending','claimed')
+        AND payload LIKE ?`,
+    [kind, `%"${kind}_id":"${sessionId}"%`],
+  );
+}
+
+export async function markJobDone(jobId: string): Promise<void> {
+  await db().run(`UPDATE jobs SET status = 'done' WHERE id = ? AND status IN ('pending','claimed')`, [jobId]);
+}
+
+/** Terminal-session names per kind (non-terminal states stay redeliverable). */
+const TERMINAL_STATE: Record<string, ReadonlySet<string>> = {
+  test: new Set(["ok", "failed"]),
+  link: new Set(["linked", "failed", "expired"]),
+};
+
+/**
+ * Claim but refuse to hand out a job whose flow already resolved (session terminal or
+ * expired) or whose run was already reported (job status done). Such stale jobs are
+ * marked 'done' instead. Without this, a failed one-shot test/link job would be
+ * redelivered forever by the RECLAIM_AFTER_MS lease and re-open Evony every ~90s —
+ * which actually happened in prod on 2026-09-24.
+ */
+export async function claimPlayable(maxSkips = 25): Promise<BubblerEvent | null> {
+  const d = db();
+  for (let i = 0; i < maxSkips; i++) {
+    const evt = await claimNext();
+    if (!evt) return null;
+
+    if (evt.kind === "test" || evt.kind === "link") {
+      const sessionId = String(evt.payload[`${evt.kind}_id`] ?? "");
+      if (sessionId) {
+        const resolved = await sessionResolved(evt.kind, sessionId);
+        if (resolved) {
+          await markJobDone(evt.job_id);
+          continue;
+        }
+      }
+    }
+    return evt;
+  }
+  return null;
+}
+
+async function sessionResolved(kind: "test" | "link", sessionId: string): Promise<boolean> {
+  const d = db();
+  const row = (await d.get(
+    `SELECT state, expires_at FROM ${kind}_sessions WHERE id = ?`,
+    [sessionId],
+  )) as { state?: string; expires_at?: string | null } | undefined;
+  if (!row) return true; // no session => nothing to run against, treat as stale
+  if (TERMINAL_STATE[kind].has(row.state ?? "")) return true;
+  // A non-terminal session whose lease lapsed is dead too (interactive link flows),
+  // otherwise the reclaim lease would resurrect long-abandoned sessions.
+  if (row.expires_at && row.expires_at <= new Date().toISOString()) return true;
+  return false;
+}
+
 export async function claimNext(): Promise<BubblerEvent | null> {
   const d = db();
   const cutoff = new Date(Date.now() - RECLAIM_AFTER_MS).toISOString();

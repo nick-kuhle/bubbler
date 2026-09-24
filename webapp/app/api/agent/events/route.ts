@@ -8,7 +8,7 @@
 // so the dashboard can tell a healthy phone from a silent one (docs/06).
 import { NextRequest, NextResponse } from "next/server";
 import { verifyBearer } from "@/lib/auth";
-import { fillDue, claimNext } from "@/lib/scheduler";
+import { fillDue, claimPlayable } from "@/lib/scheduler";
 import { touchAgentHealth } from "@/lib/agentHealth";
 
 export const runtime = "nodejs";
@@ -41,11 +41,11 @@ export async function GET(req: NextRequest) {
     await touchAgentHealth(meta, false);
 
     await fillDue();
-    let evt = await claimNext();
+    let evt = await claimPlayable();
     while (!evt && Date.now() - seen0 < holdMs - 800) {
       await new Promise((r) => setTimeout(r, 1500));
       await fillDue();
-      evt = await claimNext();
+      evt = await claimPlayable();
     }
 
     if (evt) await touchAgentHealth(meta, true);

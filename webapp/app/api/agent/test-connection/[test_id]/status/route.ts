@@ -8,12 +8,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyBearer } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { markJobDoneBySession } from "@/lib/scheduler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const ALLOWED = new Set(["pending", "running", "ok", "failed"]);
+const TERMINAL = new Set(["ok", "failed"]);
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ test_id: string }> }) {
   const agent = await verifyBearer(req);
@@ -41,5 +43,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tes
       test_id,
     ],
   );
+
+  // A terminal outcome ends the job: never reclaim a failed/ok one-shot test (a redelivered
+  // failed test is what looped the phone into open/close Evony on 2026-09-24).
+  if (TERMINAL.has(status)) await markJobDoneBySession("test", test_id);
+
   return NextResponse.json({ ok: true });
 }
