@@ -7,7 +7,7 @@ import { nid, nowIso, addDaysIso, isoWeekday, hhmm, dayKeyUTC } from "./id";
 
 export type BubblerEvent = {
   job_id: string;
-  kind: "run" | "link" | "code";
+  kind: "run" | "link" | "code" | "test";
   user_id: string;
   email: string;
   evony_name: string;

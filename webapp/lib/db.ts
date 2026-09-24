@@ -146,6 +146,14 @@ const MIGRATIONS: string[] = [
      created_at TEXT NOT NULL,
      expires_at TEXT NOT NULL
    )`,
+  `CREATE TABLE IF NOT EXISTS test_sessions (
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id),
+     state TEXT NOT NULL,
+     error TEXT,
+     created_at TEXT NOT NULL,
+     expires_at TEXT NOT NULL
+   )`,
   `CREATE TABLE IF NOT EXISTS jobs (
      id TEXT PRIMARY KEY,
      kind TEXT NOT NULL,

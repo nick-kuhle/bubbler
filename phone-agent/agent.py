@@ -224,6 +224,15 @@ class CloudClient:
         )
         r.raise_for_status()
 
+    def report_test(self, test_id: str, payload: dict) -> None:
+        log.info("test %s: %s", test_id, payload.get("status"))
+        r = self._http().post(
+            f"{self.base_url}/api/agent/test-connection/{test_id}/status",
+            json=payload,
+            timeout=30,
+        )
+        r.raise_for_status()
+
 
 class CodeRelay:
     """Bridges `link` events and the following `code` events via a queue."""
@@ -320,6 +329,58 @@ def _safe_report(cloud: CloudClient, link_id: str, payload: dict) -> None:
         log.warning("link %s report failed: %s", link_id, exc)
 
 
+def _safe_test_report(cloud: CloudClient, test_id: str, payload: dict) -> None:
+    try:
+        cloud.report_test(test_id, payload)
+    except Exception as exc:
+        log.warning("test %s report failed: %s", test_id, exc)
+
+
+_test_lock = threading.Lock()
+
+
+def run_test(cloud: CloudClient, event: dict, evony: EvonyController, bundle_id: str) -> None:
+    """Open Evony on the phone, sign in as the member's email, then report back.
+
+    A persisted device session logs in with just the email typed (no one-time code).
+    If Evony asks for a fresh 6-digit code instead, report a re-link hint rather than ok.
+    """
+    test_id = (event.get("payload") or {}).get("test_id")
+    if not test_id:
+        log.warning("test event without test_id; ignoring")
+        return
+    if not _test_lock.acquire(blocking=False):
+        log.warning("test already running; ignoring %s", test_id)
+        return
+    result = {"status": "failed", "error": "test did not start"}
+    try:
+        _safe_test_report(cloud, test_id, {"status": "running"})
+        evony.open_evony(bundle_id)
+        state = None
+        for _ in range(15):
+            state = evony.to_world_view(event.get("email", ""))
+            if state in ("world", "needs_code"):
+                break
+            time.sleep(2)
+        if state == "world":
+            result = {"status": "ok"}
+        elif state == "needs_code":
+            result = {"status": "failed",
+                      "error": "session revoked or new device — re-link from the wizard"}
+        else:
+            result = {"status": "failed", "error": "could not reach the game screen"}
+    except Exception as exc:
+        log.warning("test %s failed: %s", test_id, exc)
+        result = {"status": "failed", "error": str(exc)[:200]}
+    finally:
+        try:
+            evony.force_close_evony(bundle_id)
+        except Exception as exc:
+            log.warning("test force-close failed: %s", exc)
+        _test_lock.release()
+    _safe_test_report(cloud, test_id, result)
+
+
 def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyController,
              bundle_id: str) -> None:
     """Execute the interactive link flow, feeding codes from the long-poll stream."""
@@ -356,7 +417,7 @@ def handle_event(cloud: CloudClient, evony: EvonyController, relay: CodeRelay | 
     payload = event.get("payload") or {}
     start = time.monotonic()
 
-    if kind not in ("run", "link", "code"):
+    if kind not in ("run", "link", "code", "test"):
         log.warning("ignoring unknown event kind: %s", kind)
         return
 
@@ -365,6 +426,10 @@ def handle_event(cloud: CloudClient, evony: EvonyController, relay: CodeRelay | 
             relay.deliver_code(event)
         else:
             log.info("stray code event without active link; ignoring")
+        return
+
+    if kind == "test":
+        run_test(cloud, event, evony, bundle_id)
         return
 
     if kind == "link":

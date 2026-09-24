@@ -44,6 +44,9 @@ Use distinct staging and production environments and keep all values out of Git/
 | `POST` | `/api/agent/runs/{run_id}/evidence` | Raw PNG/JPEG to Blob; auth bearer |
 | `POST` | `/api/wizard/link`, `/api/wizard/link/{link_id}/code` | Start link / submit Evony code; web session |
 | `GET` | `/api/wizard/link/{link_id}` | Browser polls link status (about every 3s); web session |
+| `POST` | `/api/test-connection` | Start a connection test (opens Evony on the phone, signs in as the member's email); web session |
+| `GET` | `/api/test-connection/{test_id}` | Browser polls test status (about every 2s); web session |
+| `POST` | `/api/agent/test-connection/{test_id}/status` | Phone reports test progress (running/ok/failed); auth bearer |
 | `POST` | `/api/runs/now`, `/api/schedule` | Queue a manual run / manage slots; web session |
 
 Data tables are `users`, `sessions`, `slots` (one UTC weekday/time per row),

@@ -140,6 +140,18 @@
     "expiredBody": "This link ran out of time.",
     "retry": "start over"
   },
+  "test": {
+    "title": "Test connection",
+    "body": "Opens Evony on your phone, signs in as your email, and confirms everything is connected.",
+    "run": "test connection",
+    "running": "testing…",
+    "pending": "Waiting for the phone…",
+    "runningStatus": "Opening the game on the phone and signing in as {email}…",
+    "ok": "Connected. The game opened and signed in as {email}.",
+    "failed": "Couldn't complete the test.",
+    "expired": "No response from the phone. Is the on-device agent running?",
+    "startError": "Couldn't start the test."
+  },
   "info": {
     "title": "How it works",
     "intro": "LOL automatic bubble scheduler keeps peace bubbles up for alliance LOL so nobody has to babysit a shield. We don't take things seriously — we just have fun.",

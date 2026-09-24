@@ -140,6 +140,18 @@
     "expiredBody": "Este enlace se quedó sin tiempo.",
     "retry": "empezar de nuevo"
   },
+  "test": {
+    "title": "Probar conexión",
+    "body": "Abre Evony en tu teléfono, inicia sesión con tu correo y confirma que todo está conectado.",
+    "run": "probar conexión",
+    "running": "probando…",
+    "pending": "Esperando al teléfono…",
+    "runningStatus": "Abriendo el juego en el teléfono e iniciando sesión como {email}…",
+    "ok": "Conectado. El juego se abrió e inició sesión como {email}.",
+    "failed": "No se pudo completar la prueba.",
+    "expired": "Sin respuesta del teléfono. ¿Está activo el agente del dispositivo?",
+    "startError": "No se pudo iniciar la prueba."
+  },
   "info": {
     "title": "Cómo funciona",
     "intro": "LOL automatic bubble scheduler mantiene las burbujas de paz para la alianza LOL, para que nadie tenga que vigilar un escudo. No nos tomamos las cosas en serio — solo nos divertimos.",

@@ -59,7 +59,8 @@ graph TD
    link/code jobs are inserted by their respective API routes.
 3. The response is `{ "ok": true, "event": null }` (empty hold) or an event with
    `job_id`, `kind`, `user_id`, `email`, `evony_name`, `payload`. Kinds: `run` (apply a
-   truce), `link` (start Evony email login), `code` (6-digit code + link id). The agent
+   truce), `link` (start Evony email login), `code` (6-digit code + link id), `test` (open
+   Evony on the phone, sign in as the member's email and report back). The agent
    immediately polls again; the wizard browser polls link status every **3 seconds**.
    While healthy, events normally arrive quickly, but there is no guaranteed latency
    during outages or sleep.
