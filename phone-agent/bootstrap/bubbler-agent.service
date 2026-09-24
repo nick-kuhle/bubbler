@@ -9,7 +9,8 @@ Type=simple
 # (phone-agent/bootstrap/start_tunnels.sh), then `systemctl start bubbler-agent`.
 # When the agent moves fully onto the phone, use the LaunchDaemon instead.
 WorkingDirectory=/home/nickkuhle/Work/bubbler/phone-agent
-ExecStart=/usr/bin/env python3 agent.py --config config.yaml
+# deps live in a venv inside the checkout (the distro python has no pip)
+ExecStart=/home/nickkuhle/Work/bubbler/phone-agent/.venv/bin/python3 agent.py --config config.yaml
 Restart=always
 RestartSec=5
 # Belt and braces: the agent also self-exits on stall so Restart=always gets a clean

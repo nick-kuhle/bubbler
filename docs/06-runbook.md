@@ -64,18 +64,24 @@ jobs, and the heartbeat row would bounce between two hosts.
   (default 300s), so a supervisor relaunches a fresh process.
 - **Job lease:** `claimNext()` stamps `jobs.claimed_at` and auto-reclaims (`RECLAIM_AFTER_MS`
   90s) a job that was claimed but never reported — if the agent dies mid-flow, the
-  restarted agent gets the job again instead of the frontend spinning forever.
-- **Launchd is broken on this phone (Dopamine):** a LaunchDaemon is classified
-  "daemon" with a **~6MB jetsam memory limit** (`JETSAM_REASON_MEMORY_PERPROCESSLIMIT`),
-  and launchd SIGKILLs python+requests within seconds no matter the `ProcessType` or
-  `JetsamMemoryLimit` plist keys. The phone therefore runs the agent under
-  `bootstrap/run_agent_supervised.sh` **spawned from an SSH session** — such processes
-  inherit sshd's higher jetsam class and run indefinitely. Start it as root:
+  restarted agent gets the job again instead of the frontend spinning forever. Terminal
+  outcomes (test ok/failed, link linked/failed/expired, reported runs) mark the job
+  `done` and `claimPlayable()` skips already-resolved sessions, so a finished job is
+  never redelivered (this fixed the 2026-09-24 loop where a failed test reopened Evony
+  every ~90s).
+- **The agent now runs on the laptop** (2026-09-24): on-device python was jetsam-capped
+  at ~6MB (launchd-daemon class on Dopamine, `JETSAM_REASON_MEMORY_PERPROCESSLIMIT`) and
+  its timing drifted, so the brain moved to this machine and the phone is a pure
+  input/output device (ZXTouch + frida-server stay running; taps/screenshots arrive over
+  SSH tunnels). Trigger the laptop brain as a user service:
   ```sh
-  sudo sh -c 'nohup /var/jb/usr/libexec/bubbler/bootstrap/run_agent_supervised.sh >/dev/null 2>&1 &'
+  systemctl --user enable --now bubbler-agent      # deps in phone-agent/.venv
+  phone-agent/bootstrap/start_tunnels.sh           # frida 27042 + ZXTouch 6000 -> localhost
   ```
-  This is manual after a reboot until a launchd-safe launcher (a small C/supervisor
-  binary, or an app-context launch) exists.
+  Laptop mode is actually *capable* of the vision the phone lacked: with Pillow/OpenCV/
+  tesseract installed, screenshot decoding + screen-state checks now pass (the phone's
+  "No module named 'PIL'" is gone). The remaining test failure is operator calibration:
+  the post-email login-result screen still needs ROI/template capture.
 - There is **no outbound alert** (email/push) yet — an operator must look at the card.
   That is an explicit cutover gate (docs/07).
 

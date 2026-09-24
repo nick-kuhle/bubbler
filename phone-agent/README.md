@@ -1,9 +1,9 @@
-# Python agent — target runtime: jailbroken iPhone
+# Python agent — target runtime: this laptop (drives the jailbroken iPhone)
 
 The Evony email/code link flow has worked with **new users and different email addresses**
-in the operator's current setup. That test does not establish that the phone is already
-running the agent independently. The target is a LaunchDaemon on the iPhone making only
-outbound HTTPS long-polls to Vercel over WiFi. See the
+in the operator's current setup. The agent's *brain* runs here (it survived a stint
+on-device, where timing drifted and jetsam limits bit — see docs/06); the phone runs
+only ZXTouch + frida-server as touch/screenshot hardware over SSH tunnels. See the
 [cutover playbook](../docs/07-cutover.md) before retiring the local machine.
 
 ## Layout
@@ -29,13 +29,15 @@ and the War Room show it instead of spinning silently (docs/06).
 The loop also **self-exits** when the cloud is unreachable for `cloud.max_failures`
 consecutive polls or no poll round completes within `cloud.max_idle_sec`. Any supervisor
 then relaunches a fresh process:
-- **On the phone (current):** `bootstrap/run_agent_supervised.sh` (a restart loop) spawned
-  from an SSH session — launchd-daemon classes are jetsam-capped at ~6MB on Dopamine and
-  SIGKILL python, so the plist path is blocked pending a higher-limit launcher (docs/06).
-- **On the laptop (testing/calibrating):** `bootstrap/bubbler-agent.service` (systemd
-  Restart=always) after `bootstrap/start_tunnels.sh` opened the Frida/ZXTouch tunnels.
-- **On the phone (target):** `bootstrap/com.bubbler.agent.plist` (KeepAlive) via
-  `bootstrap/install.sh` — keep this on file for when a launchd-safe launcher exists.
+- **On the laptop (current since 2026-09-24):** `bootstrap/bubbler-agent.service` after
+  `bootstrap/start_tunnels.sh` opened the Frida/ZXTouch tunnels. Deps live in
+  `phone-agent/.venv/`; `systemctl --user enable --now bubbler-agent`. The phone runs
+  only ZXTouch + frida-server and is driven over the tunnels — this also restores the
+  vision (Pillow/OpenCV/tesseract) the on-phone python lacked.
+- **On the phone (retired):** `bootstrap/com.bubbler.agent.plist` (KeepAlive) via
+  `bootstrap/install.sh` and `bootstrap/run_agent_supervised.sh` were removed from the
+  device — launchd-daemon classes are jetsam-capped at ~6MB on Dopamine (SIGKILLs
+  python), and the SSH-supervised mode drifted on device timing.
 
 Only **one** agent consumes the queue at a time — a laptop and a phone agent poll-ping the
 same jobs. Whichever is live is the one that owns the heartbeat `main` row.
