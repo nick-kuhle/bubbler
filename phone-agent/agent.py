@@ -346,6 +346,13 @@ def _clamp_shield(hours):
 
 _link_lock = threading.Lock()
 
+# Cross-kind exclusion: ALL flows that touch Evony (test, link incl. its whole
+# interactive code wait, and scheduled runs) must hold this one lock, so a scheduled
+# run or a stale Test connection can never boot the operator out of an in-progress
+# login by force-closing the game. Origin: 2026-09-24 "game shuts itself down before
+# I can enter an email and ask for a code".
+_device_lock = threading.Lock()
+
 
 def _safe_report(cloud: CloudClient, link_id: str, payload: dict) -> None:
     try:
@@ -380,6 +387,10 @@ def run_test(cloud: CloudClient, event: dict, evony: EvonyController, bundle_id:
     if not _test_lock.acquire(blocking=False):
         log.warning("test already running; ignoring %s", test_id)
         return
+    if not _device_lock.acquire(blocking=False):
+        log.warning("phone busy with another flow; ignoring test %s", test_id)
+        _test_lock.release()
+        return
     email = event.get("email", "")
     expected_name = event.get("evony_name", "") or ""
     result = {"status": "failed", "error": "test did not start"}
@@ -402,6 +413,7 @@ def run_test(cloud: CloudClient, event: dict, evony: EvonyController, bundle_id:
             evony.force_close_evony(bundle_id)
         except Exception as exc:
             log.warning("test force-close failed: %s", exc)
+        _device_lock.release()
         _test_lock.release()
     _safe_test_report(cloud, test_id, result)
 
@@ -415,6 +427,12 @@ def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyCont
         return
     if not _link_lock.acquire(blocking=False):
         log.warning("link already running; ignoring %s", link_id)
+        return
+    # Hold the device across the WHOLE interactive flow (including the user's code
+    # wait), so no run/test can force-close the game mid-link.
+    if not _device_lock.acquire(blocking=False):
+        log.warning("phone busy with another flow; ignoring link %s", link_id)
+        _link_lock.release()
         return
     relay.register(link_id)
     result = {"status": "failed", "error": "unexpected"}
@@ -430,6 +448,7 @@ def run_link(cloud: CloudClient, event: dict, relay: CodeRelay, evony: EvonyCont
     finally:
         time.sleep(8)
         evony.force_close_evony(bundle_id)
+        _device_lock.release()
         _link_lock.release()
     cloud.report_link(link_id, result)
     relay.clear()
@@ -466,7 +485,14 @@ def handle_event(cloud: CloudClient, evony: EvonyController, relay: CodeRelay | 
             t.join()
         return
 
-    result = run_one(evony, event, bundle_id)
+    if not _device_lock.acquire(blocking=False):
+        log.warning("phone busy with another flow; skipping run %s",
+                    event.get("job_id"))
+        return  # stay claimed; the cloud lease redelivers it once the phone is free
+    try:
+        result = run_one(evony, event, bundle_id)
+    finally:
+        _device_lock.release()
     duration_ms = int((time.monotonic() - start) * 1000)
     report = {
         "job_id": event.get("job_id"),

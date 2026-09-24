@@ -26,6 +26,11 @@ from pathlib import Path
 
 log = logging.getLogger("bubbler.evony")
 
+# How long a login bring-up may keep the game open before we give up and let the
+# runner force-close it. The old flow bailed after ~30s and yanked Evony shut under
+# the operator mid-login; 90s gives a slow phone boot + a human-time login + bubble.
+LOGIN_GRACE_S = 90.0
+
 
 class CalibrationMissing(RuntimeError):
     pass
@@ -479,7 +484,7 @@ class EvonyController:
             log.info("verification code dialog visible")
         return ok
 
-    def _wait_for_code_dialog(self, timeout: float = 12.0) -> bool:
+    def _wait_for_code_dialog(self, timeout: float = 20.0) -> bool:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if self._code_dialog_visible():
@@ -735,6 +740,14 @@ class EvonyController:
         return False
 
     def launch_login_screen(self, bundle_id: str | None = None) -> bool:
+        """Open Evony and wait up to LOGIN_GRACE_S (90s) for the switch-account dialog.
+
+        The email-login dialog is found by screenshot heuristics; Evony on this phone
+        can boot slowly and the operator may want the full window to finish a login +
+        bubble. The old code bailed after ~30s and force-closed the game under whoever
+        was on it, so now we keep the game open and gently re-tap the login icon for
+        the whole grace window instead of aborting early.
+        """
         if not self.cal or "email_login" not in self.cal.screens:
             raise CalibrationMissing("no calibration for screen 'email_login'")
         primary = self._login_icon_point()
@@ -745,29 +758,31 @@ class EvonyController:
         log.info("login icon taps (px): %s", points)
         if bundle_id:
             self.t.launch(bundle_id)
-        if self._wait_for_splash(18.0) and self._dialog_visible():
-            return True
-        log.info("waiting 1s after opening evony before login icon taps")
-        time.sleep(1.0)
         start = time.monotonic()
-        x, y = points[0]
-        for n in range(1, 19):
-            log.info("login icon tap %s,%s #%s (+%.0fms)", x, y, n, (time.monotonic() - start) * 1000)
-            try:
-                self.t.tap(x, y)
-            except Exception as extra:
-                log.warning("login tap failed: %s", extra)
-            time.sleep(0.4)
-        if self._dialog_visible():
-            return True
-        for x, y in points[1:]:
-            log.info("login icon tap %s,%s fallback", x, y)
-            try:
-                self.t.tap(x, y)
-            except Exception as exc:
-                log.warning("login tap failed: %s", exc)
-            time.sleep(0.4)
-        return self._dialog_visible()
+        deadline = start + LOGIN_GRACE_S
+        last_tap = 0.0
+        tap_count = 0
+        seen_splash = False
+        while time.monotonic() < deadline:
+            if self._dialog_visible():
+                return True
+            now = time.monotonic()
+            img = self._grab()
+            if img is not None and not seen_splash and self._is_splash(img):
+                seen_splash = True
+                log.info("evony splash visible")
+            if now - last_tap >= 2.5:
+                x, y = points[tap_count % len(points)]
+                tap_count += 1
+                log.info("login icon tap %s,%s #%s (+%.0fs)", x, y, tap_count, now - start)
+                try:
+                    self.t.tap(x, y)
+                except Exception as exc:
+                    log.warning("login tap failed: %s", exc)
+                last_tap = now
+            time.sleep(0.5)
+        log.warning("switch-account dialog did not appear within %ss", LOGIN_GRACE_S)
+        return False
 
     def tap_resend(self) -> None:
         try:
