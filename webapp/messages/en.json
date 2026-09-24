@@ -5,9 +5,25 @@
   "nav": {
     "home": "home",
     "dashboard": "dashboard",
-    "info": "info",
-    "master": "master",
+    "info": "how it works",
+    "master": "war room",
     "wizard": "link an account"
+  },
+  "landing": {
+    "kicker": "Alliance LOL",
+    "title": "Your bubble, always up.",
+    "sub": "LOL keeps overlapping 3-day peace shields on your city — automatically. You play and have fun; we watch the timer.",
+    "email": "game email",
+    "emailPh": "you@example.com",
+    "signin": "sign in",
+    "busy": "signing in…",
+    "how": "how it works",
+    "f1t": "72-hour shields",
+    "f1b": "A fresh 3-day truce lands before the last one ends. Zero gaps, zero stress.",
+    "f2t": "2,500 gems a run",
+    "f2b": "The game spends the gems for each truce — you just approve the plan once.",
+    "f3t": "Made for LOL",
+    "f3b": "One cozy circle, zero drama. We don't do serious — we do shields."
   },
   "defaultSlots": {
     "mon": "Monday morning · 09:00",
@@ -109,6 +125,7 @@
     "linkAgain": "link another account",
     "step": "step",
     "of": "of",
+    "stepsShort": ["Account", "Game", "Code", "Link", "Plan", "Done"],
     "step1Title": "Your Evony account",
     "step1Body": "Enter the account LOL should shield — your sign-in email is already saved.",
     "accountLabel": "Evony account ID",

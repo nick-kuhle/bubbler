@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cinzel, Nunito } from "next/font/google";
+import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 
@@ -9,15 +9,25 @@ import { routing } from "@/src/i18n/routing";
 
 import "../globals.css";
 
-const cinzel = Cinzel({
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800", "900"],
+// Self-hosted via @fontsource (bundled at build time — no Google Fonts fetch,
+// so builds work offline and pages never wait on a font CDN).
+const display = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/baloo-2/files/baloo-2-latin-600-normal.woff2", weight: "600" },
+    { path: "../../node_modules/@fontsource/baloo-2/files/baloo-2-latin-700-normal.woff2", weight: "700" },
+    { path: "../../node_modules/@fontsource/baloo-2/files/baloo-2-latin-800-normal.woff2", weight: "800" },
+  ],
   variable: "--font-display",
 });
 
-const nunito = Nunito({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+const nunito = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/nunito/files/nunito-latin-400-normal.woff2", weight: "400" },
+    { path: "../../node_modules/@fontsource/nunito/files/nunito-latin-500-normal.woff2", weight: "500" },
+    { path: "../../node_modules/@fontsource/nunito/files/nunito-latin-600-normal.woff2", weight: "600" },
+    { path: "../../node_modules/@fontsource/nunito/files/nunito-latin-700-normal.woff2", weight: "700" },
+    { path: "../../node_modules/@fontsource/nunito/files/nunito-latin-800-normal.woff2", weight: "800" },
+  ],
   variable: "--font-sans",
 });
 
@@ -68,7 +78,7 @@ export default async function LocaleLayout({
   const dict = t(locale as Lang);
 
   return (
-    <html lang={locale} className={`${cinzel.variable} ${nunito.variable}`}>
+    <html lang={locale} className={`${display.variable} ${nunito.variable}`}>
       <body className={nunito.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <div className="bubbles" aria-hidden>
@@ -77,7 +87,6 @@ export default async function LocaleLayout({
             <span /><span /><span /><span /><span />
             <span /><span /><span />
           </div>
-          <div className="grain" />
           <SiteChrome dict={dict}>{children}</SiteChrome>
         </NextIntlClientProvider>
       </body>

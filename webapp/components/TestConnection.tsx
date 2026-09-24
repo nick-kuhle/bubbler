@@ -84,15 +84,16 @@ export default function TestConnection({ dict }: Props) {
 
   return (
     <section className="card">
-      <div className="hsplit">
+      <div className="section-head">
+        <span className="tile sm" aria-hidden>🔌</span>
         <div>
           <h3>{d.title}</h3>
-          <p className="muted" style={{ margin: "0.3rem 0 0" }}>{d.body}</p>
+          <p className="muted">{d.body}</p>
         </div>
-        <button type="button" onClick={() => void start()} disabled={busy}>
-          {busy ? d.running : d.run}
-        </button>
       </div>
+      <button type="button" onClick={() => void start()} disabled={busy} style={{ width: "100%" }}>
+        {busy ? d.running : d.run}
+      </button>
 
       {t.kind === "active" && !t.agentOnline && (
         <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d.agentOffline}</p>

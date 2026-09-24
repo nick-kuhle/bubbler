@@ -72,16 +72,16 @@ export default function Master() {
   return (
     <>
       <section className="hero-banner">
-        <img src="/images/banner.jpg" alt="" className="cover" />
+        <img src="/images/sky-hero.jpg" alt="" className="cover" />
         <div className="veil" />
         <div className="copy hsplit">
           <div>
-            <p className="kicker">Operator</p>
-            <h1 className="title-gold font-display" style={{ margin: "0.15rem 0 0", fontSize: "clamp(1.8rem, 5vw, 2.8rem)" }}>
+            <p className="kicker">Operator · {data.operator}</p>
+            <h1 className="title-pop font-display" style={{ margin: "0.15rem 0 0", fontSize: "clamp(1.8rem, 5vw, 2.8rem)" }}>
               War Room
             </h1>
             <p className="muted" style={{ maxWidth: 560 }}>
-              operator <strong>{data.operator}</strong> — every claimed job for alliance LOL, newest first.
+              Every claimed job for alliance LOL, newest first. More bubbles, fewer worries.
             </p>
           </div>
           <span className="badge">{data.operator}</span>
@@ -91,12 +91,17 @@ export default function Master() {
       <div style={{ display: "grid", gap: "1rem" }}>
         <section className="card">
           <div className="hsplit">
-            <h3>phone agent</h3>
+            <div className="section-head" style={{ marginBottom: 0 }}>
+              <span className="tile sm" aria-hidden>📡</span>
+              <div>
+                <h3>phone agent</h3>
+              </div>
+            </div>
             <span className={`badge ${data.agent?.online ? "ok" : "warn"}`}>
               {data.agent?.online ? "online" : "offline"}
             </span>
           </div>
-          <p className="muted" style={{ margin: "0.3rem 0 0" }}>
+          <p className="muted" style={{ margin: "0.6rem 0 0" }}>
             last seen {data.agent ? agentSince(data.agent.last_seen_at) : "never"}
             {data.agent?.version ? ` · v${data.agent.version}` : ""}
             {data.agent?.hostname ? ` · ${data.agent.hostname}` : ""}
@@ -104,13 +109,19 @@ export default function Master() {
           </p>
           {data.agent && !data.agent.online && (
             <p className="warn" style={{ margin: "0.4rem 0 0" }}>
-              silent for {ago(data.agent.offline_for_ms)} — no heartbeat, check the phone (docs/06).
+              quiet for {ago(data.agent.offline_for_ms)} with no heartbeat — wake the phone and check the agent.
             </p>
           )}
         </section>
 
         <section className="card">
-          <h3>slots</h3>
+          <div className="section-head">
+            <span className="tile sm" aria-hidden>📅</span>
+            <div>
+              <h3>slots</h3>
+            </div>
+          </div>
+          <div className="table-scroll">
           <table>
             <thead><tr><th>player</th><th>day</th><th>time</th><th>active</th></tr></thead>
             <tbody>
@@ -125,10 +136,17 @@ export default function Master() {
               {data.slots.length === 0 && <tr><td colSpan={4} className="muted">no slots yet</td></tr>}
             </tbody>
           </table>
+          </div>
         </section>
 
         <section className="card">
-          <h3>runs</h3>
+          <div className="section-head">
+            <span className="tile sm" aria-hidden>🚀</span>
+            <div>
+              <h3>runs</h3>
+            </div>
+          </div>
+          <div className="table-scroll">
           <table>
             <thead><tr><th>player</th><th>kind</th><th>status</th><th>shield hrs left</th><th>created</th></tr></thead>
             <tbody>
@@ -144,6 +162,7 @@ export default function Master() {
               {data.runs.length === 0 && <tr><td colSpan={5} className="muted">no runs yet — they appear as the scheduler works</td></tr>}
             </tbody>
           </table>
+          </div>
         </section>
       </div>
     </>

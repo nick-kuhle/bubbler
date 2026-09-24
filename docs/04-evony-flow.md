@@ -13,11 +13,14 @@ vision-based shield verification or on-phone-only operation. The run flow below 
   Therefore we do **not** react to attacks — we keep an always-on shield topped up on
   schedule. (A shield with >24h remaining cancels most risk; skipping an unnecessary
   re-application is a target behavior, not currently proven.)
-- **Login is email + one-time 6-digit code.** The email-login control is the small **gold
-  person icon in the top-left of the loading/connecting screen** (iPhone XR screenshot
-  pixels ≈ 50,248). It is only tappable while the game is loading and may need repeated
-  taps. After it lands, Evony shows **Switch Account** → email → 6-digit code (~90s).
-- Sessions persist on the device. A same-device re-login needs only the email typed (no code).
+- **Login is email + one-time 6-digit code — the first time.** The email-login control is
+  the small **gold person icon in the top-left of the loading/connecting screen** (iPhone XR
+  screenshot pixels ≈ 50,248). It is only tappable while the game is loading and may need
+  repeated taps. After it lands, Evony shows **Switch Account** → email → 6-digit code (~90s).
+- **Linked accounts skip the code.** Once an email is linked on this device, confirming the
+  email goes straight to the **load-account Confirm** ("login as \<user\>") — no code is sent
+  or asked. That Confirm tap is the last step before the world view. Every scheduled run
+  logs in this way, one user at a time.
 - **"Clear Other Devices"** in Evony settings revokes the device session → next run must
   re-link with a **fresh 6-digit code** (surfaced via the web-app re-link flow).
 - **A new-device login kicks the online user.** We never leave Evony idling; we open it,
@@ -32,10 +35,13 @@ claim job (from long-poll event)
   │
   ├─ idempotency guard: shield already up with >24h remaining?  → mark ok, skip
   │
-  ├─ launch Evony
-  ├─ state check: "on the post-login world view?"
-  │     ├─ no, code prompt shown → abort (current run_one reports status=expired; re-link UX pending)
-  │     └─ no, not logged in → type email (fetched from the event payload); if code prompt appears → abort
+  ├─ launch Evony, tap the loading-screen login icon (same entry as linking)
+  ├─ ALWAYS switch account to the event's email (the phone serves many users;
+  │     whoever was logged in last may be someone else — never assume)
+  ├─ after email Confirm, classify the next dialog:
+  │     ├─ load-account Confirm ("login as <user>") → tap Confirm → world view
+  │     └─ 6-digit code prompt → session revoked → report status=expired
+  │        (dashboard surfaces the wizard re-link path; see 01-product §4)
   ├─ navigate: open shield/bubble item → select 3-day Truce (2500💎) → Activate → Confirm
   ├─ verify: screenshot → shield indicator present AND countdown readout ≥ 3 days − ε
   ├─ close Evony (back to home screen)
@@ -43,9 +49,21 @@ claim job (from long-poll event)
   └─ report (POST /api/agent/runs) + upload evidence screenshot
 ```
 
+The linked-account login (`EvonyController.login_linked_account`) reuses the
+link-verified email preamble (icon taps, email typing, Confirm at 579,1100) and then
+distinguishes the load-account Confirm from the code dialog by dialog chrome (red-cancel
+pixel, code-box pixels, dialog content signature), with optional `load_confirm.png` /
+`code_dialog.png` template overrides when vision is enabled. Ambiguous parchment resolves
+to `needs_code` — mis-tapping Confirm on a code dialog is worse than asking for a re-link.
+
+Test it on the phone before trusting a schedule (see
+`phone-agent/calibration/README.md`): `python test_login.py --email <linked>` saves a
+screenshot per stage (`post_email`, `post_load_confirm`, `world`) for visual verification.
+
 **Target improvement:** after each tap/type, confirm the expected screen and retry a
-bounded number of times. Current run code relies heavily on coordinates/sleeps; it does
-not yet provide these guards or reliable OCR-based failure diagnosis.
+bounded number of times. Bubble taps are still uncalibrated (`world_view/bubble_menu`,
+`truce_3day/select`, `activate_confirm/activate+confirm`) — `apply_3day_bubble` reports
+exactly which are missing until `test_login.py --record-taps` fills them in.
 
 ### B. Link flow (first login / re-link) — event kinds `link` + `code`
 
@@ -81,7 +99,8 @@ email-link with a verified truce application.
 - **Template matching (OpenCV `matchTemplate`)** on reference screenshots + ROI maps stored
   in `phone-agent/calibration/`:
   - `email_login.png` — entry button for email login
-  - `code_dialog.png` — 6-digit code entry
+  - `code_dialog.png` — 6-digit code entry (also overrides run-login classification)
+  - `load_confirm.png` — linked-login "login as \<user\>" Confirm (overrides classification)
   - `world_view.png` — post-login server/world screen
   - `truce_3day.png` — the 3-day truce item
   - `activate_confirm.png` — activate/confirm dialogs

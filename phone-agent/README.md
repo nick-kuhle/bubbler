@@ -11,6 +11,7 @@ outbound HTTPS long-polls to Vercel over WiFi. See the
 ```
 agent.py             GET /api/agent/events long-poll, dispatch and report
 evony.py             in-game link + bubble orchestration
+test_login.py        linked-login test + bubble-tap calibration helper (on-phone)
 vision.py            template/OCR helpers (requires device calibration)
 iphone/transport.py  ZXTouch + Frida support; currently has laptop-test SSH fallback
 config.example.yaml  config template (no secrets)
@@ -38,6 +39,20 @@ then relaunches a fresh process:
 
 Only **one** agent consumes the queue at a time — a laptop and a phone agent poll-ping the
 same jobs. Whichever is live is the one that owns the heartbeat `main` row.
+## Testing the scheduled-run login (on the phone)
+
+Scheduled runs log in as each already-linked user with email + load-account Confirm —
+no 6-digit code. Before trusting a schedule, run the login test from the installed
+agent directory and inspect the per-stage screenshots:
+
+```sh
+cd /var/jb/usr/libexec/bubbler
+python3 test_login.py --email member@example.com   # check shots/ afterwards
+```
+
+`--record-taps` then walks through the 3-day-bubble tap calibration, and `--and-bubble`
+attempts a full apply once taps exist. Laptop-safe manifest check:
+`python3 test_login.py --dry-run`. Details in [calibration/README.md](calibration/README.md).
 
 ## On-device prerequisites (not yet verified by this review)
 
