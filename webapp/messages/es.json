@@ -142,18 +142,18 @@
   },
   "test": {
     "title": "Probar conexión",
-    "body": "Abre Evony en tu teléfono, inicia sesión con tu correo y confirma que todo está conectado.",
+    "body": "Ejecuta una comprobación rápida de conectividad entre nuestro agente y el servidor.",
     "run": "probar conexión",
     "running": "probando…",
-    "pending": "Esperando al teléfono…",
-    "runningStatus": "Abriendo el juego en el teléfono e iniciando sesión como {email}…",
-    "ok": "Conectado. El juego se abrió e inició sesión como {email}.",
+    "pending": "Esperando al agente…",
+    "runningStatus": "Contactando con el agente y comprobando la conexión…",
+    "ok": "Conectado. El agente llegó al servidor y respondió.",
     "okName": "Conectado. Sesión iniciada como {name} — eres tú.",
-    "okUnverified": "Conectado — se inició sesión en la cuenta de este correo, pero el teléfono aún no puede leer el nombre en el juego (visión/calibración desactivada).",
-    "failed": "No se pudo completar la prueba.",
-    "expired": "Sin respuesta del teléfono. ¿Está activo el agente del dispositivo?",
-    "agentOffline": "El agente del teléfono está sin conexión — el teléfono no puede responder hasta que vuelva.",
-    "startError": "No se pudo iniciar la prueba."
+    "okUnverified": "Conectado. Se alcanzó la cuenta de este correo, pero el agente aún no pudo leer el nombre en el juego.",
+    "failed": "No se pudo completar la comprobación de conexión.",
+    "expired": "El agente no respondió a tiempo. ¿Está en línea el agente?",
+    "agentOffline": "El agente está sin conexión — no puede responder hasta que vuelva.",
+    "startError": "No se pudo iniciar la comprobación."
   },
   "agentStatus": {
     "title": "Agente del teléfono",

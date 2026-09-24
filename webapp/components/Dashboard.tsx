@@ -358,7 +358,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         </div>
       </section>
 
-      <TestConnection dict={dict} email={me.user.email} />
+      <TestConnection dict={dict} />
       <AgentStatus dict={dict} />
 
       <section className="card">

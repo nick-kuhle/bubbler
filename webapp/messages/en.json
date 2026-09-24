@@ -142,18 +142,18 @@
   },
   "test": {
     "title": "Test connection",
-    "body": "Opens Evony on your phone, signs in as your email, and confirms everything is connected.",
+    "body": "Runs a quick connectivity check between our agent and the server.",
     "run": "test connection",
     "running": "testing…",
-    "pending": "Waiting for the phone…",
-    "runningStatus": "Opening the game on the phone and signing in as {email}…",
-    "ok": "Connected. The game opened and signed in as {email}.",
+    "pending": "Waiting for the agent…",
+    "runningStatus": "Contacting the agent and checking connectivity…",
+    "ok": "Connected. The agent reached the server and responded.",
     "okName": "Connected. Signed in as {name} — that's you.",
-    "okUnverified": "Connected — signed into the account behind this email, but the phone could not read the in-game name yet (vision/calibration is off).",
-    "failed": "Couldn't complete the test.",
-    "expired": "No response from the phone. Is the on-device agent running?",
-    "agentOffline": "The phone agent is offline — the phone can't respond until it's back.",
-    "startError": "Couldn't start the test."
+    "okUnverified": "Connected. The account for this email was reached, but the agent couldn't read the in-game name yet.",
+    "failed": "Couldn't complete the connectivity check.",
+    "expired": "The agent didn't respond in time. Is the agent online?",
+    "agentOffline": "The agent is offline — it can't respond until it's back.",
+    "startError": "Couldn't start the check."
   },
   "agentStatus": {
     "title": "Phone agent",

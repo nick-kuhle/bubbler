@@ -51,21 +51,33 @@ export async function fillDue(now: Date = new Date()): Promise<void> {
 }
 
 /**
- * Claim the oldest pending job as a long-poll event, or null when nothing is due. The
- * claim is a single UPDATE keyed off the row it found, so two serverless holds can never
- * both fire for the same job.
+ * Claim the oldest not-being-worked job as a long-poll event, or null when nothing is due.
+ * The claim is a single UPDATE keyed off the row it found, so two serverless holds can
+ * never both fire for the same job.
+ *
+ * Lease: a claimed job is stamped with `claimed_at` and is *reclaimed* (auto-redelivered)
+ * once `RECLAIM_AFTER_MS` has passed without the agent reporting. So if the on-device
+ * agent dies or loses its response mid-flow, the job is not stuck forever: the next poll
+ * (after the supervisor restarts the agent) gets it again. Duplicate in-flight delivery
+ * is guarded on the agent side (per-kind _link_lock / sync handle) and is far safer than
+ * a job sitting claimed forever (docs/02 "claimed without a lease" gate).
  */
+export const RECLAIM_AFTER_MS = 90_000;
+
 export async function claimNext(): Promise<BubblerEvent | null> {
   const d = db();
+  const cutoff = new Date(Date.now() - RECLAIM_AFTER_MS).toISOString();
   const row = (await d.get(
     `SELECT j.id AS job_id, j.kind, j.user_id, u.email, u.evony_name, j.payload
        FROM jobs j JOIN users u ON u.id = j.user_id
-      WHERE j.status = 'pending' AND (j.expires_at IS NULL OR j.expires_at > ?)
+      WHERE (j.status = 'pending'
+             OR (j.status = 'claimed' AND j.claimed_at IS NOT NULL AND j.claimed_at < ?))
+        AND (j.expires_at IS NULL OR j.expires_at > ?)
       ORDER BY j.created_at LIMIT 1`,
-    [nowIso()],
+    [cutoff, nowIso()],
   )) as (Row & { job_id: string; kind: "run" | "link" | "code" | "test"; user_id: string; email: string; evony_name: string; payload: string }) | undefined;
   if (!row) return null;
-  await d.run("UPDATE jobs SET status = 'claimed' WHERE id = ?", [row.job_id]);
+  await d.run("UPDATE jobs SET status = 'claimed', claimed_at = ? WHERE id = ?", [nowIso(), row.job_id]);
   const payload = JSON.parse(row.payload || "{}") as Record<string, unknown>;
   if (row.kind === "code") {
     await d.run("UPDATE jobs SET payload = '{}' WHERE id = ?", [row.job_id]);

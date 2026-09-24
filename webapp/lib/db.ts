@@ -168,7 +168,7 @@ const MIGRATIONS: string[] = [
      pid INTEGER,
      updated_at TEXT NOT NULL
     )`,
-  `CREATE TABLE IF NOT EXISTS jobs (
+`CREATE TABLE IF NOT EXISTS jobs (
      id TEXT PRIMARY KEY,
      kind TEXT NOT NULL,
      user_id TEXT NOT NULL REFERENCES users(id),
@@ -176,8 +176,9 @@ const MIGRATIONS: string[] = [
      status TEXT NOT NULL DEFAULT 'pending',
      uniq TEXT,
      created_at TEXT NOT NULL,
+     claimed_at TEXT,
      expires_at TEXT
-   )`,
+    )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_uniq ON jobs(uniq)`,
   `CREATE INDEX IF NOT EXISTS idx_jobs_pending ON jobs(status, created_at)`,
   `CREATE TABLE IF NOT EXISTS runs (
@@ -206,6 +207,10 @@ const COLUMN_ADDITIONS: Array<{ sql: string; col: string }> = [
   {
     col: "test_sessions.verified",
     sql: `ALTER TABLE test_sessions ADD COLUMN verified INTEGER`,
+  },
+  {
+    col: "jobs.claimed_at",
+    sql: `ALTER TABLE jobs ADD COLUMN claimed_at TEXT`,
   },
 ];
 

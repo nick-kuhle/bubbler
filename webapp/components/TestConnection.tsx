@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Dict } from "@/lib/i18n";
 
-type Props = { dict: Dict; email: string };
+type Props = { dict: Dict };
 
 type TestState =
   | { kind: "idle" }
@@ -23,7 +23,7 @@ type PollData = {
   agent_online?: boolean;
 };
 
-export default function TestConnection({ dict, email }: Props) {
+export default function TestConnection({ dict }: Props) {
   const d = dict.test;
   const [t, setT] = useState<TestState>({ kind: "idle" });
 
@@ -78,7 +78,7 @@ export default function TestConnection({ dict, email }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [t, email]);
+  }, [t]);
 
   const busy = t.kind === "starting" || t.kind === "active";
 
@@ -100,7 +100,7 @@ export default function TestConnection({ dict, email }: Props) {
       {t.kind === "active" && (
         <p className="wizard-status">
           <span className="spin" aria-hidden />
-          {t.server === "running" ? d.runningStatus.replace("{email}", email) : d.pending}
+          {t.server === "running" ? d.runningStatus : d.pending}
         </p>
       )}
       {t.kind === "ok" && (

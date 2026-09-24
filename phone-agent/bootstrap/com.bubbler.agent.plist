@@ -34,7 +34,9 @@
     <true/>
     <key>ThrottleInterval</key>
     <integer>5</integer>
-    <key>ProcessType</key>
-    <string>Background</string>
+    <!-- No ProcessType "Background": the OS jetsams Background-class helpers under
+         memory pressure the moment a heavy game (Evony) loads, SIGKILLing the daemon
+         mid-flow. The default class survives the launch window better; the agent's
+         job lease (webapp RECLAIM_AFTER_MS) redelivers anything lost anyway. -->
 </dict>
 </plist>
