@@ -61,9 +61,21 @@ jobs, and the heartbeat row would bounce between two hosts.
   Online window is 120s (a healthy poll cadence is ~46s).
 - The agent **self-exits** when the cloud is unreachable for `cloud.max_failures`
   (default 8) consecutive polls or no poll round completes within `cloud.max_idle_sec`
-  (default 300s). launchd `KeepAlive` / systemd `Restart=always` then relaunch a fresh
-  process. A stuck transport, missing ZXTouch, or dead frida-server becomes a clear
-  offline signal + restart instead of silent dark.
+  (default 300s), so a supervisor relaunches a fresh process.
+- **Job lease:** `claimNext()` stamps `jobs.claimed_at` and auto-reclaims (`RECLAIM_AFTER_MS`
+  90s) a job that was claimed but never reported — if the agent dies mid-flow, the
+  restarted agent gets the job again instead of the frontend spinning forever.
+- **Launchd is broken on this phone (Dopamine):** a LaunchDaemon is classified
+  "daemon" with a **~6MB jetsam memory limit** (`JETSAM_REASON_MEMORY_PERPROCESSLIMIT`),
+  and launchd SIGKILLs python+requests within seconds no matter the `ProcessType` or
+  `JetsamMemoryLimit` plist keys. The phone therefore runs the agent under
+  `bootstrap/run_agent_supervised.sh` **spawned from an SSH session** — such processes
+  inherit sshd's higher jetsam class and run indefinitely. Start it as root:
+  ```sh
+  sudo sh -c 'nohup /var/jb/usr/libexec/bubbler/bootstrap/run_agent_supervised.sh >/dev/null 2>&1 &'
+  ```
+  This is manual after a reboot until a launchd-safe launcher (a small C/supervisor
+  binary, or an app-context launch) exists.
 - There is **no outbound alert** (email/push) yet — an operator must look at the card.
   That is an explicit cutover gate (docs/07).
 

@@ -34,9 +34,16 @@
     <true/>
     <key>ThrottleInterval</key>
     <integer>5</integer>
-    <!-- No ProcessType "Background": the OS jetsams Background-class helpers under
-         memory pressure the moment a heavy game (Evony) loads, SIGKILLing the daemon
-         mid-flow. The default class survives the launch window better; the agent's
-         job lease (webapp RECLAIM_AFTER_MS) redelivers anything lost anyway. -->
+    <!-- ProcessType must be Interactive: the default "daemon" class gets a ~6MB jetsam
+         limit and priority ~40, so the OS SIGKILLs python+requests within seconds (last
+         exit reason was JETSAM_REASON_MEMORY_PERPROCESSLIMIT). Interactive raises the
+         jetsam memory limit/priority so the long-poll loop survives an idle cycle. -->
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <!-- JetsamMemoryLimit overrides the daemon-category default (~6 MB, which SIGKILLed
+         python+requests within seconds: JETSAM_REASON_MEMORY_PERPROCESSLIMIT). Launchd
+         honors this key on iOS 15+; measured via `launchctl print system/com.bubbler.agent`. -->
+    <key>JetsamMemoryLimit</key>
+    <integer>96</integer>
 </dict>
 </plist>

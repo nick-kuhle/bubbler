@@ -6,6 +6,13 @@ iPhone XR (828 × 1792); it has **no complete world view / 3-day truce / shield 
 entries**. Image templates are intentionally git-ignored and must be copied to the phone
 securely. Working linking is not proof that unattended bubble runs are calibrated.
 
+On-device vision caveat: python wheels for `Pillow`/`cv2`/`pytesseract` are **not
+installable on this phone** (no iOS arm64 wheels; source builds fail). Until prebuilt
+wheels or a ZXTouch `image_match` (task 21) based state-check exist, the agent runs in
+**no-verify mode**: it taps, but refuses identity confirmation it cannot read and fails
+flows that need a screen-state check (it reported "switch account dialog did not appear").
+Capture the ROIs below and turn vision on only once on-phone vision actually works.
+
 The agent reads **`calibration.json`**, not per-screen YAML files. For example:
 
 ```json

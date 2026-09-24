@@ -28,10 +28,13 @@ and the War Room show it instead of spinning silently (docs/06).
 The loop also **self-exits** when the cloud is unreachable for `cloud.max_failures`
 consecutive polls or no poll round completes within `cloud.max_idle_sec`. Any supervisor
 then relaunches a fresh process:
-- **On the phone (target):** `bootstrap/com.bubbler.agent.plist` (KeepAlive) via
-  `bootstrap/install.sh`.
+- **On the phone (current):** `bootstrap/run_agent_supervised.sh` (a restart loop) spawned
+  from an SSH session — launchd-daemon classes are jetsam-capped at ~6MB on Dopamine and
+  SIGKILL python, so the plist path is blocked pending a higher-limit launcher (docs/06).
 - **On the laptop (testing/calibrating):** `bootstrap/bubbler-agent.service` (systemd
   Restart=always) after `bootstrap/start_tunnels.sh` opened the Frida/ZXTouch tunnels.
+- **On the phone (target):** `bootstrap/com.bubbler.agent.plist` (KeepAlive) via
+  `bootstrap/install.sh` — keep this on file for when a launchd-safe launcher exists.
 
 Only **one** agent consumes the queue at a time — a laptop and a phone agent poll-ping the
 same jobs. Whichever is live is the one that owns the heartbeat `main` row.

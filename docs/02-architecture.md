@@ -82,8 +82,10 @@ graph TD
 
 **Reliability gap (must fix before unattended operation):** `claimNext()` reads a pending
 job then updates it to `claimed` in separate queries, without an atomic claim/lease/ack.
-Two pollers can pick the same job. A claimed job has no reclaim path if its response is
-lost or the agent dies. Expired pending code jobs are filtered, but not automatically
+Two pollers can pick the same job (only one agent polls today, so this is latent). A
+claimed job now carries a **lease stamp (`claimed_at`)** and is auto-reclaimed after 90s
+(`RECLAIM_AFTER_MS`) when the agent never reports, so a lost response or dead agent no
+longer strands a job. Expired pending code jobs are filtered, but not automatically
 purged. A claimed code job has its payload set to `{}`, but its row remains. Code delivery
 currently queues the digits briefly in Postgres/SQLite; it is *not* “never stored.” Fix
 these behaviors and test reconnect/resend before depending on autonomous scheduling.
