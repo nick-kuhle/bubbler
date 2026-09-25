@@ -7,6 +7,21 @@ type Agent = {
   online: boolean; last_seen_at: string | null; last_event_at: string | null;
   version: string | null; hostname: string | null; pid: number | null; offline_for_ms: number;
 };
+
+// operator view (full admin estate)
+type Overview = {
+  role: "operator";
+  operator: { id: string; email: string; evony_name: string };
+  counts: { users: number; sessions: number; link_sessions: number; test_sessions: number; jobs: number; jobs_pending: number; runs: number };
+  accounts: Account[];
+  slots: Slot[];
+  sessions: Session[];
+  link_sessions: LinkSession[];
+  test_sessions: TestSession[];
+  jobs: Job[];
+  runs: Run[];
+  agent: Agent;
+};
 type Account = {
   id: string; email: string; evony_name: string; is_operator: number;
   slot_count: number; active_slots: number; last_link_state: string | null; last_run_status: string | null;
@@ -19,18 +34,9 @@ type TestSession = { id: string; user_id: string; email: string; state: string; 
 type Job = { id: string; kind: string; status: string; user_id: string; email: string; created_at: string; claimed_at: string | null };
 type Run = { id: string; trigger: string; status: string; shield_hours_remaining: number | null; evidence_ref: string | null; error: string | null; duration_ms: number | null; created_at: string; evony_name: string };
 
-type Overview = {
-  operator: { email: string; evony_name: string };
-  counts: { users: number; sessions: number; link_sessions: number; test_sessions: number; jobs: number; jobs_pending: number; runs: number };
-  accounts: Account[];
-  slots: Slot[];
-  sessions: Session[];
-  link_sessions: LinkSession[];
-  test_sessions: TestSession[];
-  jobs: Job[];
-  runs: Run[];
-  agent: Agent;
-};
+// member view (read-only roster)
+type RosterRow = { name: string; bubble_hours_remaining: number | null; next_bubble: { weekday: number; time: string } | null };
+type Roster = { role: "member"; roster: RosterRow[]; agent: Agent };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const dayName = (weekday: number): string => DAYS[weekday - 1] ?? String(weekday);
@@ -46,10 +52,8 @@ function ago(ms: number): string {
 }
 const fmt = (ts: string | null | undefined): string =>
   ts ? String(ts).slice(0, 16).replace("T", " ") : "—";
-const since = (ts: string | null): string =>
-  !ts ? "never" : ago(Date.now() - Date.parse(ts)) + " ago";
 const agentSince = (ts: string | null): string =>
-  !ts ? "never" : Date.now() - Date.parse(ts) < 45_000 ? "just now" : since(ts);
+  !ts ? "never" : Date.now() - Date.parse(ts) < 45_000 ? "just now" : ago(Date.now() - Date.parse(ts)) + " ago";
 
 function tone(status: string | null): string {
   const s = String(status ?? "").toLowerCase();
@@ -59,10 +63,15 @@ function tone(status: string | null): string {
   return "";
 }
 
+const fmtHours = (h: number | null): string =>
+  h == null ? "N/A" : `${(Math.round(h * 10) / 10).toFixed(1).replace(/\.0$/, "")}h`;
+const fmtNext = (n: RosterRow["next_bubble"]): string =>
+  n ? `${dayName(n.weekday)} ${n.time} UTC` : "N/A";
+
 type Notice = { kind: "ok" | "err"; text: string } | null;
 
 export default function Master() {
-  const [data, setData] = useState<Overview | null>(null);
+  const [data, setData] = useState<Overview | Roster | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -70,9 +79,10 @@ export default function Master() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/admin/overview");
-      if (!r.ok) throw new Error(`operator read failed (${r.status}) — operator sign-in required`);
-      setData((await r.json()) as Overview);
+      const r = await fetch("/api/master");
+      if (r.status === 401) throw new Error("sign-in required");
+      if (!r.ok) throw new Error(`war room failed (${r.status})`);
+      setData((await r.json()) as Overview | Roster);
     } catch (e) {
       setError(e instanceof Error ? e.message : "unknown error");
     }
@@ -105,6 +115,83 @@ export default function Master() {
     }
   }
 
+  if (error) {
+    return (
+      <section className="card warn">
+        <p>{error}</p>
+        <Link href="/">back to login</Link>
+      </section>
+    );
+  }
+  if (!data) {
+    return <section className="card"><p className="muted">loading war room…</p></section>;
+  }
+
+  if (data.role === "member") {
+    return <RosterView data={data} />;
+  }
+  return <AdminView data={data} busyAction={busyAction} notice={notice} act={act} refresh={() => void load()} />;
+}
+
+function RosterView({ data }: { data: Roster }) {
+  return (
+    <>
+      <section className="hero-banner">
+        <img src="/images/sky-hero.jpg" alt="" className="cover" />
+        <div className="veil" />
+        <div className="copy hsplit">
+          <div>
+            <p className="kicker">Alliance LOL</p>
+            <h1 className="title-pop font-display" style={{ margin: "0.15rem 0 0", fontSize: "clamp(1.8rem, 5vw, 2.8rem)" }}>
+              War Room
+            </h1>
+            <p className="muted" style={{ maxWidth: 560 }}>
+              Everyone&apos;s bubbles at a glance. See your shield at /dashboard.
+            </p>
+          </div>
+          <span className={`badge ${data.agent?.online ? "ok" : "warn"}`}>
+            {data.agent?.online ? "agent online" : "agent offline"}
+          </span>
+        </div>
+      </section>
+      <section className="card">
+        <div className="section-head">
+          <span className="tile sm" aria-hidden>🛡️</span>
+          <div><h3>bubbles ({data.roster.length})</h3></div>
+        </div>
+        <div className="table-scroll">
+          <table>
+            <thead><tr><th>player</th><th>bubble left</th><th>next bubble</th></tr></thead>
+            <tbody>
+              {data.roster.map((p, i) => (
+                <tr key={i}>
+                  <td>{p.name}</td>
+                  <td>{p.bubble_hours_remaining != null ? <span className="badge ok">{fmtHours(p.bubble_hours_remaining)}</span> : <span className="muted">N/A</span>}</td>
+                  <td>{p.next_bubble ? <span className="badge">{fmtNext(p.next_bubble)}</span> : <span className="muted">N/A</span>}</td>
+                </tr>
+              ))}
+              {data.roster.length === 0 && <tr><td colSpan={3} className="muted">no registered players yet</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function AdminView({
+  data,
+  busyAction,
+  notice,
+  act,
+  refresh,
+}: {
+  data: Overview;
+  busyAction: string | null;
+  notice: Notice;
+  act: (key: string, fn: () => Promise<Response>, okText: string) => Promise<void>;
+  refresh: () => void;
+}) {
   const bubble = (a: Account) =>
     act(`bubble:${a.id}`, () => fetch("/api/runs/now", {
       method: "POST",
@@ -127,18 +214,10 @@ export default function Master() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ active: s.active === 0 }),
     }), `slot ${dayName(s.weekday)} ${s.time}`);
-
-  if (error) {
-    return (
-      <section className="card warn">
-        <p>{error}</p>
-        <Link href="/">back to login</Link>
-      </section>
-    );
-  }
-  if (!data) {
-    return <section className="card"><p className="muted">loading admin data…</p></section>;
-  }
+  const removeUser = (a: Account) => {
+    if (!window.confirm(`Remove ${a.evony_name} (${a.email}) permanently?\n\nThis deletes EVERYTHING for them — slots, sessions, link history, jobs and runs. This cannot be undone.`)) return;
+    void act(`rm:${a.id}`, () => fetch(`/api/admin/users/${encodeURIComponent(a.id)}`, { method: "DELETE" }), `${a.evony_name} removed`);
+  };
 
   return (
     <>
@@ -156,7 +235,7 @@ export default function Master() {
             </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
-            <button type="button" onClick={() => void load()}>refresh</button>
+            <button type="button" onClick={refresh}>refresh</button>
             {busyAction && <span className="badge warn">working…</span>}
           </div>
         </div>
@@ -232,6 +311,11 @@ export default function Master() {
                         <button type="button" className="subtle" disabled={busyAction === `cut:${a.id}`} onClick={() => cutSessions(a)}>
                           cut sessions
                         </button>
+                        {!a.is_operator && (
+                          <button type="button" className="subtle" disabled={busyAction === `rm:${a.id}`} onClick={() => removeUser(a)}>
+                            remove
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -242,12 +326,9 @@ export default function Master() {
         </section>
 
         <section className="card">
-          <div className="hsplit">
-            <div className="section-head" style={{ marginBottom: 0 }}>
-              <span className="tile sm" aria-hidden>📅</span>
-              <div><h3>slots ({data.slots.length})</h3></div>
-            </div>
-            <button type="button" className="subtle" onClick={() => void load()}>reload</button>
+          <div className="section-head">
+            <span className="tile sm" aria-hidden>📅</span>
+            <div><h3>slots ({data.slots.length})</h3></div>
           </div>
           <div className="table-scroll">
             <table>
