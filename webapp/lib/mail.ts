@@ -39,7 +39,7 @@ function htmlBody(code: string): string {
         <div style="max-width:420px;background:#ffffff;border-radius:16px;padding:32px;box-shadow:0 8px 30px rgba(29,78,216,.12);">
           <div style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:20px;color:#1d4ed8;margin-bottom:12px;">🛡️ LOL Bubbler</div>
           <p style="margin:0 0 8px;font-size:15px;line-height:1.5;">Your one-time login code is:</p>
-          <div style="font-family:monospace;font-weight:700;font-size:32px;letter-spacing:10px;text-align:center;color:#1e3a8a;background:#eff6ff;border:1px dashed #93c5fd;border-radius:12px;padding:16px 8px;margin:16px 0;">${c}</div>
+          <div style="font-family:monospace;font-weight:700;font-size:27px;letter-spacing:6px;white-space:nowrap;text-align:center;color:#1e3a8a;background:#eff6ff;border:1px dashed #93c5fd;border-radius:12px;padding:18px 8px;margin:16px 0;line-height:1.2;">${c}</div>
           <p style="margin:0;font-size:13px;line-height:1.5;color:#6b7280;">It expires in 10 minutes and works once. If you didn't ask for this code, you can safely ignore this email.</p>
         </div>
       </td></tr>
