@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Dict } from "@/lib/i18n";
-
-type Props = { dict: Dict };
+import { useTranslations } from "next-intl";
 
 type TestState =
   | { kind: "idle" }
@@ -23,8 +21,8 @@ type PollData = {
   agent_online?: boolean;
 };
 
-export default function TestConnection({ dict }: Props) {
-  const d = dict.test;
+export default function TestConnection() {
+  const d = useTranslations("test");
   const [t, setT] = useState<TestState>({ kind: "idle" });
 
   async function start() {
@@ -87,38 +85,38 @@ export default function TestConnection({ dict }: Props) {
       <div className="section-head">
         <span className="tile sm" aria-hidden>🔌</span>
         <div>
-          <h3>{d.title}</h3>
-          <p className="muted">{d.body}</p>
+          <h3>{d("title")}</h3>
+          <p className="muted">{d("body")}</p>
         </div>
       </div>
       <button type="button" onClick={() => void start()} disabled={busy} style={{ width: "100%" }}>
-        {busy ? d.running : d.run}
+        {busy ? d("running") : d("run")}
       </button>
 
       {t.kind === "active" && !t.agentOnline && (
-        <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d.agentOffline}</p>
+        <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d("agentOffline")}</p>
       )}
       {t.kind === "active" && (
         <p className="wizard-status">
           <span className="spin" aria-hidden />
-          {t.server === "running" ? d.runningStatus : d.pending}
+          {t.server === "running" ? d("runningStatus") : d("pending")}
         </p>
       )}
       {t.kind === "ok" && (
         <p className="ok" style={{ margin: "0.6rem 0 0" }}>
           {t.verified && t.confirmed
-            ? d.okName.replace("{name}", t.confirmed)
-            : d.okUnverified}
+            ? d("okName", { name: t.confirmed })
+            : d("okUnverified")}
         </p>
       )}
       {t.kind === "failed" && (
         <p className="warn" style={{ margin: "0.6rem 0 0" }}>
-          {d.failed}
+          {d("failed")}
           {t.error ? ` — ${t.error}` : ""}
         </p>
       )}
-      {t.kind === "expired" && <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d.expired}</p>}
-      {t.kind === "error" && <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d.startError}</p>}
+      {t.kind === "expired" && <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d("expired")}</p>}
+      {t.kind === "error" && <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d("startError")}</p>}
     </section>
   );
 }

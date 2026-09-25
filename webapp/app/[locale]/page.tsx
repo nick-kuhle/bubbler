@@ -2,7 +2,9 @@
 
 import { FormEvent, useState } from "react";
 
-import { Link, useLocale, useTranslations } from "@/lib/i18n";
+import { useLocale, useTranslations } from "next-intl";
+
+import { Link } from "@/src/i18n/navigation";
 
 export default function Landing() {
   const locale = useLocale();

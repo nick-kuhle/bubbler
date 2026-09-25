@@ -4,7 +4,7 @@
 // One row = one day + its own time (Mon 09:00 / Wed 09:00 / Fri 18:00 are three rows).
 // Pure editing surface: owns no persistence — parents POST /api/schedule themselves.
 
-import type { Dict } from "@/lib/i18n";
+import { useTranslations } from "next-intl";
 
 export type EditSlot = {
   key: number; // stable client-only row key (React + radio names)
@@ -87,21 +87,20 @@ function shieldUntil(s: EditSlot, now: Date = new Date()): Date | null {
   return null;
 }
 
-function untilLabel(s: EditSlot, dict: Dict): string {
-  const until = shieldUntil(s);
-  if (!until) return "—";
-  const wd = ((until.getUTCDay() + 6) % 7) + 1;
-  return `${dict.dashboard.short[DAY_KEYS[wd - 1]]} ${until.toISOString().slice(11, 16)}`;
-}
-
 type Props = {
   slots: EditSlot[];
   onChange: (next: EditSlot[]) => void;
-  dict: Dict;
 };
 
-export default function SlotsEditor({ slots, onChange, dict }: Props) {
-  const d = dict.dashboard;
+export default function SlotsEditor({ slots, onChange }: Props) {
+  const d = useTranslations("dashboard");
+
+  const untilLabel = (s: EditSlot): string => {
+    const until = shieldUntil(s);
+    if (!until) return "—";
+    const wd = ((until.getUTCDay() + 6) % 7) + 1;
+    return `${d(`short.${DAY_KEYS[wd - 1]}`)} ${until.toISOString().slice(11, 16)}`;
+  };
 
   const patch = (key: number, next: Partial<EditSlot>) =>
     onChange(slots.map((s) => (s.key === key ? { ...s, ...next } : s)));
@@ -122,20 +121,20 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
       <table>
         <thead>
           <tr>
-            <th>{d.dayCol}</th>
-            <th>{d.timeLabel} (UTC)</th>
-            <th>{d.shieldCol}</th>
-            <th>{d.gemsCol}</th>
-            <th>{d.shieldUntil}</th>
-            <th>{d.activeCol}</th>
-            <th aria-label={d.removeSlot} />
+            <th>{d("dayCol")}</th>
+            <th>{d("timeLabel")} (UTC)</th>
+            <th>{d("shieldCol")}</th>
+            <th>{d("gemsCol")}</th>
+            <th>{d("shieldUntil")}</th>
+            <th>{d("activeCol")}</th>
+            <th aria-label={d("removeSlot")} />
           </tr>
         </thead>
         <tbody>
           {slots.map((s) => (
             <tr key={s.key} style={s.active ? undefined : { opacity: 0.55 }}>
               <td>
-                <div className="day-grid" role="radiogroup" aria-label={d.dayCol}>
+                <div className="day-grid" role="radiogroup" aria-label={d("dayCol")}>
                   {DAY_KEYS.map((key, i) => (
                     <label key={key} className={`day-chip${s.weekday === i + 1 ? " on" : ""}`}>
                       <input
@@ -144,7 +143,7 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
                         checked={s.weekday === i + 1}
                         onChange={() => patch(s.key, { weekday: i + 1 })}
                       />
-                      {d.short[key]}
+                      {d(`short.${key}`)}
                     </label>
                   ))}
                 </div>
@@ -153,18 +152,18 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
                 <input
                   type="time"
                   value={s.time}
-                  aria-label={`${d.timeLabel} — ${d[DAY_KEYS[s.weekday - 1]]}`}
+                  aria-label={`${d("timeLabel")} — ${d(DAY_KEYS[s.weekday - 1])}`}
                   onChange={(e) => patch(s.key, { time: e.target.value })}
                 />
               </td>
-              <td>{d.shield72}</td>
-              <td>{d.gems72}</td>
-              <td className="muted">{untilLabel(s, dict)}</td>
+              <td>{d("shield72")}</td>
+              <td>{d("gems72")}</td>
+              <td className="muted">{untilLabel(s)}</td>
               <td>
                 <input
                   type="checkbox"
                   checked={s.active}
-                  aria-label={d.activeCol}
+                  aria-label={d("activeCol")}
                   onChange={(e) => patch(s.key, { active: e.target.checked })}
                 />
               </td>
@@ -173,7 +172,7 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
                   type="button"
                   className="btn-icon"
                   onClick={() => remove(s.key)}
-                  aria-label={`${d.removeSlot}: ${d[DAY_KEYS[s.weekday - 1]]} ${s.time}`}
+                  aria-label={`${d("removeSlot")}: ${d(DAY_KEYS[s.weekday - 1])} ${s.time}`}
                 >
                   ×
                 </button>
@@ -182,7 +181,7 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
           ))}
           {slots.length === 0 && (
             <tr>
-              <td colSpan={7} className="muted">{d.noSlots}</td>
+              <td colSpan={7} className="muted">{d("noSlots")}</td>
             </tr>
           )}
         </tbody>
@@ -195,7 +194,7 @@ export default function SlotsEditor({ slots, onChange, dict }: Props) {
         disabled={slots.length >= MAX_SLOTS}
         style={{ marginTop: "0.7rem" }}
       >
-        + {d.addSlot}
+        + {d("addSlot")}
       </button>
     </div>
   );

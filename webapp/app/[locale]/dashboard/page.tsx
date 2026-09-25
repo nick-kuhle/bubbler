@@ -1,7 +1,9 @@
+import { notFound } from "next/navigation";
+import { hasLocale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 
 import Dashboard from "@/components/Dashboard";
-import { Lang, t } from "@/lib/i18n";
+import { routing } from "@/src/i18n/routing";
 
 export default async function DashboardPage({
   params,
@@ -9,6 +11,7 @@ export default async function DashboardPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
-  return <Dashboard dict={t(locale as Lang)} />;
+  return <Dashboard />;
 }

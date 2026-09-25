@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+
 import { useRouter } from "@/src/i18n/navigation";
-import { Link, type Dict } from "@/lib/i18n";
+import { Link } from "@/src/i18n/navigation";
 import UnlinkButton from "@/components/UnlinkButton";
 import SlotsEditor, {
   DEFAULT_SLOTS,
@@ -11,14 +13,15 @@ import SlotsEditor, {
   slotsAreValid,
 } from "@/components/SlotsEditor";
 
-type Props = { dict: Dict };
-
 type LinkState = "idle" | "awaiting_phone" | "awaiting_code" | "linked" | "failed" | "expired";
 
 const STEPS = 6;
 
-export default function WizardForm({ dict }: Props) {
-  const w = dict.wizard;
+export default function WizardForm() {
+  const w = useTranslations("wizard");
+  const d = useTranslations("dashboard");
+  const tSlots = useTranslations("defaultSlots");
+  const stepsShort = w.raw("stepsShort") as string[];
   const router = useRouter();
   const [already, setAlready] = useState<boolean | null>(null);
   const [account, setAccount] = useState("");
@@ -81,7 +84,7 @@ export default function WizardForm({ dict }: Props) {
     e.preventDefault();
     const name = account.trim();
     if (!name) {
-      setMessage({ kind: "error", text: w.startError });
+      setMessage({ kind: "error", text: w("startError") });
       return;
     }
     setMessage(null);
@@ -93,7 +96,7 @@ export default function WizardForm({ dict }: Props) {
       });
       const data = (await r.json().catch(() => ({}))) as { link_id?: string; state?: string };
       if (!r.ok || !data.link_id) {
-        setMessage({ kind: "error", text: w.startError });
+        setMessage({ kind: "error", text: w("startError") });
         return;
       }
       setLinkId(String(data.link_id));
@@ -101,7 +104,7 @@ export default function WizardForm({ dict }: Props) {
       setCode("");
       setSubmitting(false);
     } catch {
-      setMessage({ kind: "error", text: w.startError });
+      setMessage({ kind: "error", text: w("startError") });
     }
   }
 
@@ -109,7 +112,7 @@ export default function WizardForm({ dict }: Props) {
     e.preventDefault();
     if (!linkId) return;
     if (!/^\d{6}$/.test(code)) {
-      setMessage({ kind: "error", text: w.codeError });
+      setMessage({ kind: "error", text: w("codeError") });
       return;
     }
     setMessage(null);
@@ -122,11 +125,11 @@ export default function WizardForm({ dict }: Props) {
       });
       if (!r.ok) {
         setSubmitting(false);
-        setMessage({ kind: "error", text: w.codeError });
+        setMessage({ kind: "error", text: w("codeError") });
       }
     } catch {
       setSubmitting(false);
-      setMessage({ kind: "error", text: w.codeError });
+      setMessage({ kind: "error", text: w("codeError") });
     }
   }
 
@@ -145,7 +148,7 @@ export default function WizardForm({ dict }: Props) {
   /** Step 5 → 6: persist the confirmed slots, then land on the dashboard. */
   async function confirmSchedule() {
     if (!slotsAreValid(slots)) {
-      setScheduleError(slots.length === 0 ? dict.dashboard.emptySlots : dict.dashboard.badTime);
+      setScheduleError(slots.length === 0 ? d("emptySlots") : d("badTime"));
       return;
     }
     setScheduleError(null);
@@ -166,7 +169,7 @@ export default function WizardForm({ dict }: Props) {
       });
       if (!r.ok) {
         setSavingSchedule(false);
-        setScheduleError(w.step5Error);
+        setScheduleError(w("step5Error"));
         return;
       }
       setScheduleSaved(true);
@@ -174,7 +177,7 @@ export default function WizardForm({ dict }: Props) {
       router.push("/dashboard");
     } catch {
       setSavingSchedule(false);
-      setScheduleError(w.step5Error);
+      setScheduleError(w("step5Error"));
     }
   }
 
@@ -194,7 +197,7 @@ export default function WizardForm({ dict }: Props) {
   if (already === null) {
     return (
       <section className="card" style={{ maxWidth: 560, margin: "3rem auto" }}>
-        <p className="muted">{w.loading}</p>
+        <p className="muted">{w("loading")}</p>
       </section>
     );
   }
@@ -203,11 +206,11 @@ export default function WizardForm({ dict }: Props) {
     return (
       <section className="card" style={{ maxWidth: 560, margin: "3rem auto", textAlign: "center" }}>
         <span className="check" aria-hidden>✓</span>
-        <h2 style={{ margin: "0.6rem 0 0.3rem" }}>{w.alreadyTitle}</h2>
-        <p className="muted">{w.alreadyBody}</p>
+        <h2 style={{ margin: "0.6rem 0 0.3rem" }}>{w("alreadyTitle")}</h2>
+        <p className="muted">{w("alreadyBody")}</p>
         <div className="row" style={{ justifyContent: "center", marginTop: "1rem" }}>
-          <Link className="btn" href="/dashboard">{w.goDashboard}</Link>
-          <UnlinkButton dict={dict} onUnlinked={() => setAlready(false)} />
+          <Link className="btn" href="/dashboard">{w("goDashboard")}</Link>
+          <UnlinkButton onUnlinked={() => setAlready(false)} />
         </div>
       </section>
     );
@@ -218,10 +221,10 @@ export default function WizardForm({ dict }: Props) {
       <section className="card" style={{ maxWidth: 560, margin: "3rem auto", textAlign: "center" }}>
         <span className="tile sun" aria-hidden>😅</span>
         <h2 style={{ margin: "0.6rem 0 0.3rem" }}>
-          {state === "expired" ? w.expiredTitle : w.failedTitle}
+          {state === "expired" ? w("expiredTitle") : w("failedTitle")}
         </h2>
-        <p className="muted">{state === "expired" ? w.expiredBody : w.failedBody}</p>
-        <button onClick={restart} style={{ marginTop: "1rem" }}>{w.retry}</button>
+        <p className="muted">{state === "expired" ? w("expiredBody") : w("failedBody")}</p>
+        <button onClick={restart} style={{ marginTop: "1rem" }}>{w("retry")}</button>
       </section>
     );
   }
@@ -231,13 +234,13 @@ export default function WizardForm({ dict }: Props) {
       <div className="section-head">
         <span className="tile" aria-hidden>🔗</span>
         <div>
-          <h2 style={{ marginBottom: "0.2rem" }}>{w.title}</h2>
-          <p className="muted" style={{ margin: 0 }}>{w.intro}</p>
+          <h2 style={{ marginBottom: "0.2rem" }}>{w("title")}</h2>
+          <p className="muted" style={{ margin: 0 }}>{w("intro")}</p>
         </div>
       </div>
 
-      <div className="steps" role="list" aria-label={`${w.step} ${step} ${w.of} ${STEPS}`}>
-        {w.stepsShort.map((label, i) => {
+      <div className="steps" role="list" aria-label={`${w("step")} ${step} ${w("of")} ${STEPS}`}>
+        {stepsShort.map((label, i) => {
           const n = i + 1;
           const cls = n < step ? "done" : n === step ? "active" : "";
           return (
@@ -251,41 +254,41 @@ export default function WizardForm({ dict }: Props) {
 
       {step === 1 && (
         <form onSubmit={(e) => void start(e)}>
-          <h3>{w.step1Title}</h3>
-          <p className="muted">{w.step1Body}</p>
+          <h3>{w("step1Title")}</h3>
+          <p className="muted">{w("step1Body")}</p>
           <label className="field">
-            <span>{w.accountLabel}</span>
+            <span>{w("accountLabel")}</span>
             <input
               type="text"
               autoFocus
               value={account}
-              placeholder={w.accountPlaceholder}
+              placeholder={w("accountPlaceholder")}
               onChange={(e) => setAccount(e.target.value)}
               style={{ width: "100%" }}
             />
           </label>
           {message && <p className="warn" role="alert">{message.text}</p>}
-          <button type="submit">{w.start}</button>
+          <button type="submit">{w("start")}</button>
         </form>
       )}
 
       {step === 3 && (
         <form onSubmit={(e) => void submitCode(e)}>
-          <h3>{w.step3Title}</h3>
+          <h3>{w("step3Title")}</h3>
           {state === "awaiting_phone" ? (
             <p className="wizard-status">
               <span className="spin" aria-hidden />
-              {w.step2Waiting}
+              {w("step2Waiting")}
             </p>
           ) : (
             <p className="wizard-status ok">
               <span>✓</span>
-              {w.step2Connected}
+              {w("step2Connected")}
             </p>
           )}
-          <p className="muted">{w.step3Body}</p>
+          <p className="muted">{w("step3Body")}</p>
           <label className="field">
-            <span>{w.step3Title}</span>
+            <span>{w("step3Title")}</span>
             <input
               type="text"
               inputMode="numeric"
@@ -293,35 +296,35 @@ export default function WizardForm({ dict }: Props) {
               maxLength={6}
               autoFocus
               value={code}
-              placeholder={w.codePlaceholder}
+              placeholder={w("codePlaceholder")}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               className="otp"
               style={{ width: "100%" }}
             />
           </label>
           {message && <p className="warn" role="alert">{message.text}</p>}
-          <button type="submit" disabled={code.length !== 6}>{w.submitCode}</button>
+          <button type="submit" disabled={code.length !== 6}>{w("submitCode")}</button>
         </form>
       )}
 
       {step === 4 && (
         <div>
-          <h3>{w.step4Title}</h3>
+          <h3>{w("step4Title")}</h3>
           <p className="wizard-status">
             <span className="spin" aria-hidden />
-            {w.step4Body}
+            {w("step4Body")}
           </p>
         </div>
       )}
 
       {step === 5 && (
         <div>
-          <h3>{w.step5Title}</h3>
-          <p className="muted">{w.step5Body}</p>
+          <h3>{w("step5Title")}</h3>
+          <p className="muted">{w("step5Body")}</p>
           <p className="muted" style={{ margin: "0.2rem 0 0.8rem" }}>
-            {dict.defaultSlots.mon} · {dict.defaultSlots.wed} · {dict.defaultSlots.fri}
+            {tSlots("mon")} · {tSlots("wed")} · {tSlots("fri")}
           </p>
-          <SlotsEditor slots={slots} onChange={setSlots} dict={dict} />
+          <SlotsEditor slots={slots} onChange={setSlots} />
           {scheduleError && (
             <p className="warn" role="alert" style={{ marginTop: "0.6rem" }}>{scheduleError}</p>
           )}
@@ -331,7 +334,7 @@ export default function WizardForm({ dict }: Props) {
             disabled={savingSchedule}
             style={{ marginTop: "0.9rem" }}
           >
-            {savingSchedule ? w.step5Saving : w.step5Confirm}
+            {savingSchedule ? w("step5Saving") : w("step5Confirm")}
           </button>
         </div>
       )}
@@ -339,10 +342,10 @@ export default function WizardForm({ dict }: Props) {
       {step === 6 && (
         <div style={{ textAlign: "center" }}>
           <span className="check" aria-hidden>✓</span>
-          <h3 style={{ margin: "0.6rem 0 0.3rem" }}>{w.step6Title}</h3>
-          <p className="muted">{w.step6Body}</p>
+          <h3 style={{ margin: "0.6rem 0 0.3rem" }}>{w("step6Title")}</h3>
+          <p className="muted">{w("step6Body")}</p>
           <Link className="btn" href="/dashboard" style={{ marginTop: "0.5rem", display: "inline-block" }}>
-            {w.toDashboard}
+            {w("toDashboard")}
           </Link>
         </div>
       )}

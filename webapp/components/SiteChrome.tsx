@@ -1,26 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import UtcClock from "@/components/UtcClock";
-import { Link, UTC_NOTE, type Dict } from "@/lib/i18n";
-import { usePathname } from "@/src/i18n/navigation";
+import { UTC_NOTE } from "@/lib/constants";
+import { Link, usePathname } from "@/src/i18n/navigation";
 
-export default function SiteChrome({
-  children,
-  dict,
-}: {
-  children: React.ReactNode;
-  dict: Dict;
-}) {
+export default function SiteChrome({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("nav");
+  const tInfo = useTranslations("info");
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const items = [
-    { href: "/dashboard", label: dict.nav.dashboard },
-    { href: "/wizard", label: dict.nav.wizard },
-    { href: "/master", label: dict.nav.master },
-    { href: "/info", label: dict.nav.info },
+    { href: "/dashboard", label: t("dashboard") },
+    { href: "/wizard", label: t("wizard") },
+    { href: "/master", label: t("master") },
+    { href: "/info", label: t("info") },
   ];
   const active = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`) ? "active" : "";
@@ -65,7 +62,7 @@ export default function SiteChrome({
       </div>
       <main>{children}</main>
       <footer className="site-foot">
-        <p>{dict.info.privateBody}</p>
+        <p>{tInfo("privateBody")}</p>
         <p className="sig">💙 ALLIANCE LOL · KEEP THE BUBBLES UP 💙</p>
       </footer>
       <nav className="bottom-nav">

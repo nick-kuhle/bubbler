@@ -1,10 +1,13 @@
-import { setRequestLocale } from "next-intl/server";
+import { notFound } from "next/navigation";
+import { hasLocale } from "next-intl";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import UnlinkButton from "@/components/UnlinkButton";
 import WizardForm from "@/components/WizardForm";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { Lang, Link, t } from "@/lib/i18n";
+import { Link } from "@/src/i18n/navigation";
+import { routing } from "@/src/i18n/routing";
 
 export default async function WizardPage({
   params,
@@ -14,9 +17,9 @@ export default async function WizardPage({
   searchParams: Promise<{ again?: string }>;
 }) {
   const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
-  const dict = t(locale as Lang);
-  const w = dict.wizard;
+  const w = await getTranslations("wizard");
 
   const again = (await searchParams).again === "1";
   const user = await currentUser();
@@ -24,10 +27,10 @@ export default async function WizardPage({
   if (!user) {
     return (
       <section className="card" style={{ maxWidth: 560, margin: "3rem auto", textAlign: "center" }}>
-        <h2 style={{ marginBottom: "0.3rem" }}>{w.signedOutTitle}</h2>
-        <p className="muted">{w.signedOutBody}</p>
+        <h2 style={{ marginBottom: "0.3rem" }}>{w("signedOutTitle")}</h2>
+        <p className="muted">{w("signedOutBody")}</p>
         <Link className="btn" href="/" style={{ display: "inline-block", marginTop: "0.6rem" }}>
-          {w.signIn}
+          {w("signIn")}
         </Link>
       </section>
     );
@@ -42,11 +45,11 @@ export default async function WizardPage({
       return (
         <section className="card" style={{ maxWidth: 560, margin: "3rem auto", textAlign: "center" }}>
           <span className="check" aria-hidden>✓</span>
-          <h2 style={{ margin: "0.6rem 0 0.3rem" }}>{w.alreadyTitle}</h2>
-          <p className="muted">{w.alreadyBody}</p>
+          <h2 style={{ margin: "0.6rem 0 0.3rem" }}>{w("alreadyTitle")}</h2>
+          <p className="muted">{w("alreadyBody")}</p>
           <div className="row" style={{ justifyContent: "center", marginTop: "1rem" }}>
-            <Link className="btn" href="/dashboard">{w.goDashboard}</Link>
-            <UnlinkButton dict={dict} />
+            <Link className="btn" href="/dashboard">{w("goDashboard")}</Link>
+            <UnlinkButton />
           </div>
         </section>
       );
@@ -59,10 +62,10 @@ export default async function WizardPage({
         <span className="tile" aria-hidden>🛡️</span>
         <div>
           <p className="kicker">Truce Agreement</p>
-          <h2 className="title-pop font-display" style={{ margin: "0.15rem 0 0" }}>{w.title}</h2>
+          <h2 className="title-pop font-display" style={{ margin: "0.15rem 0 0" }}>{w("title")}</h2>
         </div>
       </div>
-      <WizardForm dict={dict} />
+      <WizardForm />
     </>
   );
 }

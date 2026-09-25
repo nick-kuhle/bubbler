@@ -1,14 +1,15 @@
-// components/LanguageSwitcher.tsx — client island. iScout-style select: one normalized
-// select, one option per locale showing only the native-language name (English · Español).
-// Changing locale via next-intl's router.push(pathname, {locale}) — URL gets a canonical
-// /<locale>/… prefix, no cookie needs to be written here.
+// components/LanguageSwitcher.tsx — client island. One option per locale showing the
+// native-language name (English · العربية · Dansk · …). Switching pushes the same
+// pathname under the new canonical /<locale>/… prefix — no cookies, no page reload
+// dance. The list itself comes from src/i18n/routing.ts, so new languages show up
+// here automatically.
 
 "use client";
 
-import { useLocale, useTranslations } from "@/lib/i18n";
-import { NATIVE } from "@/lib/i18n";
+import { useLocale, useTranslations } from "next-intl";
+
 import { usePathname, useRouter } from "@/src/i18n/navigation";
-import { routing } from "@/src/i18n/routing";
+import { LOCALE_LABELS, routing, type Locale } from "@/src/i18n/routing";
 
 export default function LanguageSwitcher() {
   const t = useTranslations();
@@ -32,7 +33,7 @@ export default function LanguageSwitcher() {
       <select
         value={locale}
         onChange={(e) => {
-          const next = e.target.value;
+          const next = e.target.value as Locale;
           router.push(pathname, { locale: next });
         }}
         style={{
@@ -52,7 +53,7 @@ export default function LanguageSwitcher() {
       >
         {routing.locales.map((l) => (
           <option key={l} value={l}>
-            {NATIVE[l]}
+            {LOCALE_LABELS[l]}
           </option>
         ))}
       </select>
