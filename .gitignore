@@ -15,6 +15,10 @@ phone-agent/calibration/*.png
 phone-agent/calibration/*.jpg
 phone-agent/calibration/*.jpeg
 
+# Debug screenshots (device/account data, transient)
+phone-agent/grabs/
+phone-agent/shots/
+
 # Local SQLite state is not source code; use managed Postgres in production
 webapp/data/*.db*
 

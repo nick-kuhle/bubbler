@@ -305,6 +305,9 @@ def make_components(cfg: dict):
         port=int(phone.get("frida_port", 27042)),
         touch_host=str(phone.get("zxtouch_host", "127.0.0.1")),
         touch_port=int(phone.get("zxtouch_port", 6000)),
+        ssh_host=str(phone.get("ssh_host", "") or ""),
+        ssh_user=str(phone.get("ssh_user", "mobile") or "mobile"),
+        ssh_key=str(phone.get("ssh_key", "/tmp/opencode/bubbler_phone_ed25519")),
     )
     transport.configure_templates(str(phone.get(
         "zxtouch_template_dir",

@@ -1,13 +1,31 @@
 {
-  "screen": {"width": 828, "height": 1792, "scale": 2},
+  "screen": {
+    "width": 828,
+    "height": 1792,
+    "scale": 2
+  },
   "screens": {
     "email_login": {
       "template": "email_login.png",
       "taps": {
-        "email_button": {"x": 50, "y": 248},
-        "email": {"x": 414, "y": 830},
-        "continue": {"x": 579, "y": 1100}
-      }
+        "email_button": {
+          "x": 50,
+          "y": 248
+        },
+        "email": {
+          "x": 414,
+          "y": 830
+        },
+        "continue": {
+          "x": 579,
+          "y": 1100
+        }
+      },
+      "icon_offset": [
+        44,
+        50
+      ],
+      "note": "Gold person icon on the Evony loading/connecting screen. icon_offset maps the template top-left to the icon center press point; only visible ~3-10s after launch, before Evony auto-logs in as the previous user."
     },
     "switch_account": {
       "template": "switch_account.png"
@@ -15,38 +33,104 @@
     "code_dialog": {
       "template": "code_dialog.png",
       "taps": {
-        "code": {"x": 130, "y": 813},
-        "confirm": {"x": 580, "y": 1082},
-        "resend": {"x": 250, "y": 1082},
-        "done": {"x": 605, "y": 1146},
-        "load_confirm": {"x": 579, "y": 1100}
+        "code": {
+          "x": 130,
+          "y": 813
+        },
+        "confirm": {
+          "x": 580,
+          "y": 1082
+        },
+        "resend": {
+          "x": 250,
+          "y": 1082
+        },
+        "done": {
+          "x": 605,
+          "y": 1146
+        },
+        "load_confirm": {
+          "x": 579,
+          "y": 1100
+        }
       },
       "boxes": [
-        {"x": 130, "y": 813},
-        {"x": 241, "y": 813},
-        {"x": 352, "y": 813},
-        {"x": 463, "y": 813},
-        {"x": 573, "y": 813},
-        {"x": 684, "y": 813}
+        {
+          "x": 130,
+          "y": 813
+        },
+        {
+          "x": 241,
+          "y": 813
+        },
+        {
+          "x": 352,
+          "y": 813
+        },
+        {
+          "x": 463,
+          "y": 813
+        },
+        {
+          "x": 573,
+          "y": 813
+        },
+        {
+          "x": 684,
+          "y": 813
+        }
       ],
       "keypad": {
-        "1": {"x": 142, "y": 1244},
-        "2": {"x": 414, "y": 1244},
-        "3": {"x": 686, "y": 1244},
-        "4": {"x": 142, "y": 1362},
-        "5": {"x": 414, "y": 1362},
-        "6": {"x": 686, "y": 1362},
-        "7": {"x": 142, "y": 1474},
-        "8": {"x": 414, "y": 1474},
-        "9": {"x": 686, "y": 1474},
-        "0": {"x": 414, "y": 1586}
+        "1": {
+          "x": 142,
+          "y": 1244
+        },
+        "2": {
+          "x": 414,
+          "y": 1244
+        },
+        "3": {
+          "x": 686,
+          "y": 1244
+        },
+        "4": {
+          "x": 142,
+          "y": 1362
+        },
+        "5": {
+          "x": 414,
+          "y": 1362
+        },
+        "6": {
+          "x": 686,
+          "y": 1362
+        },
+        "7": {
+          "x": 142,
+          "y": 1474
+        },
+        "8": {
+          "x": 414,
+          "y": 1474
+        },
+        "9": {
+          "x": 686,
+          "y": 1474
+        },
+        "0": {
+          "x": 414,
+          "y": 1586
+        }
       }
     },
     "login_prompt": {
       "template": "login_prompt.png",
       "note": "Same dialog as load_confirm (test-connection flow reads name_roi here).",
       "taps": {
-        "confirm": {"x": 579, "y": 1100}
+        "confirm": {
+          "x": 579,
+          "y": 1100
+        }
       }
     },
     "profile": {
@@ -54,11 +138,23 @@
     },
     "load_confirm": {
       "template": "load_confirm.png",
-      "note": "Last step of linked-account login: after Confirm on the email entry, Evony shows 'login as <user>' with a Confirm button (no 6-digit code). Taps verified from the link flow; drop a dialog crop as load_confirm.png to enable template matching.",
+      "note": "Last step of linked-account login: the DARK overlay 'delete your current progress and load the Lv30 account <name>?' (Cancel left, Confirm right). Template = dialog crop; name_roi = the second text line holding the account name; taps from the captured jblake3 dialog.",
       "taps": {
-        "confirm": {"x": 579, "y": 1100},
-        "cancel": {"x": 250, "y": 1100}
-      }
+        "confirm": {
+          "x": 620,
+          "y": 1055
+        },
+        "cancel": {
+          "x": 250,
+          "y": 1100
+        }
+      },
+      "name_roi": [
+        97,
+        872,
+        637,
+        45
+      ]
     },
     "world_view": {
       "template": "world_view.png",

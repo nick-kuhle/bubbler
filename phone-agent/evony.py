@@ -20,6 +20,7 @@ from __future__ import annotations
 import io
 import logging
 import json
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -166,15 +167,25 @@ class EvonyController:
         bundle_id: str | None = None,
         post_email_timeout: float = 15.0,
         world_timeout: float = 60.0,
+        expected_name: str | None = None,
     ) -> dict:
         """Log in as an already-linked user: launch -> loading-icon taps ->
-        type email -> Confirm -> tap the load-account Confirm (no 6-digit code).
+        type email -> Confirm -> verify the load-account dialog -> tap its
+        Confirm (no 6-digit code).
+
+        The load-account confirm ('…load the Lv30 account <name>?') is the
+        account-switch gate: Evony only shows it once the typed email is
+        accepted, so reaching the world without it means the switch never
+        happened and whoever was already on the phone is still logged in — we
+        refuse that as `failed` instead of claiming a wrong-account world.
+
+        When `expected_name` is given AND name OCR is calibrated, the displayed
+        name is verified before Confirm is tapped (refuse on mismatch).
 
         Returns {status, error?} with status one of:
-          world      — reached the post-login world view, ready for bubble taps
+          world      — post-login load-account confirm tapped, world actually reached
           needs_code — Evony asked for a 6-digit code: the device session was
-                       revoked ("Clear Other Devices" / new device). The run is
-                       reported `expired` and the user must re-link in the wizard.
+                       revoked ("Clear Other Devices" / new device).
           failed     — anything else; `error` says what to check/fix.
         """
         self.last_login = {}
@@ -207,8 +218,7 @@ class EvonyController:
                 # Confirm tap did not register; retry once before giving up.
                 log.info("still on email entry; retrying confirm tap")
                 pre["sig"] = self._dialog_signature(self._grab())
-                self.t.tap(579, 1100)
-                time.sleep(2.8)
+                self._tap_email_confirm()
                 self._snap("post_email_retry")
                 state = self._wait_for_post_email_state(post_email_timeout,
                                                         pre.get("sig"))
@@ -221,15 +231,30 @@ class EvonyController:
                     return self._login_result(
                         "failed", "email confirm did not advance past email entry")
             if state == "none":
-                # No dialog at all: Evony may be auto-loading straight to world.
-                if self._wait_for_world(20.0):
+                # The load-account confirm may lag a beat behind the email
+                # confirm — give it a short window before treating 'no dialog'
+                # as the auto-restore case.
+                if self._wait_for_load_confirm(12.0):
+                    state = "load"
+                    log.info("post-email state revised: load")
+                elif self._wait_for_world(20.0):
                     self._snap("world")
-                    return self._login_result("world")
+                    return self._login_result(
+                        "failed",
+                        "world reached without a load-account confirm; "
+                        "account switch unverified (previous user may still be logged in)")
                 return self._login_result(
                     "failed", "no confirmation dialog after email confirm")
 
-            # Linked path: load-account Confirm is the last step before login.
-            self._confirm_load_account()
+            # Linked path: verify + tap the load-account Confirm (last step).
+            accepted, confirmed = self._accept_load_confirm(expected_name)
+            if not accepted:
+                return self._login_result(
+                    "failed",
+                    "load-account would reach a different account: "
+                    f"{confirmed or 'unknown'}")
+            if confirmed:
+                self.last_login["confirmed_name"] = confirmed
             self._snap("post_load_confirm")
             time.sleep(3.0)
             if self._code_dialog_visible():
@@ -382,6 +407,30 @@ class EvonyController:
         raw = (spec.get("taps") or {}).get("email_button") or {"x": 50, "y": 248}
         return int(raw["x"]), int(raw["y"])
 
+    def _find_login_icon(self) -> tuple[int, int] | None:
+        """Live position of the gold login icon on the loading screen: top-left
+        of the `email_login` template match plus a calibrated icon offset.
+        Evony only shows the icon during the splash/connecting window (~3-10s
+        after launch), so the caller must press it fast and re-locate each poll.
+        Returns None when vision/calibration can't pin it down this poll."""
+        if self.v is None or not self.cal:
+            return None
+        spec = self.cal.screens.get("email_login") or {}
+        tmpl = spec.get("template")
+        offset = spec.get("icon_offset") or [44, 50]
+        if not tmpl:
+            return None
+        try:
+            raw, _img = self._grab_both()
+            if raw is None:
+                return None
+            hit = self.v.find_template(raw, tmpl)
+            if hit is None:
+                return None
+            return int(hit[0] + offset[0]), int(hit[1] + offset[1])
+        except Exception:
+            return None
+
     def _grab_raw(self):
         try:
             return self.t.screenshot()
@@ -418,7 +467,7 @@ class EvonyController:
             return None
         spec = self.cal.screens.get(screen_name) or {}
         tmpl = spec.get("template")
-        if not tmpl:
+        if not tmpl or not (self.v.library.dir / tmpl).is_file():
             return None
         try:
             return self.v.find_template(shot, tmpl) is not None
@@ -460,6 +509,13 @@ class EvonyController:
         img = self._grab()
         if img is None:
             return False
+        if self._code_dialog_present(img):
+            log.info("verification code dialog visible")
+            return True
+        return False
+
+    @staticmethod
+    def _code_dialog_present(img) -> bool:
         cr, cg, cb = img.getpixel((250, 1100))
         red_cancel = cr > 70 and cr > cg + 30 and cg < 90
         if red_cancel:
@@ -479,10 +535,63 @@ class EvonyController:
             rows += 1
             if n and hits / n >= 0.5:
                 rows_ok += 1
-        ok = rows > 0 and (rows_ok / rows) >= 0.35
-        if ok:
-            log.info("verification code dialog visible")
-        return ok
+        return rows > 0 and (rows_ok / rows) >= 0.35
+
+    def _is_load_confirm_dialog(self, img) -> bool:
+        """True when the dark '…load the Lv30 account <name>?  Cancel | Confirm'
+        overlay is on screen — the last step of an already-linked login.
+        Structurally distinct from the parchment dialogs and from the (bright)
+        world: a near-black overlay with two thin white text lines and the
+        Cancel|Confirm button pair with an empty gap between them."""
+        if img is None:
+            return False
+        w, h = img.size
+        if w < 800 or h < 1600:
+            return False
+
+        def cov(y0, y1, x0, x1):
+            hits = n = 0
+            for y in range(y0, y1, 3):
+                for x in range(x0, x1, 3):
+                    r, g, b = img.getpixel((x, y))
+                    n += 1
+                    if (r + g + b) / 3 > 120:
+                        hits += 1
+            return (hits / n) if n else 0.0
+
+        tot = n = 0
+        for y in range(400, 1500, 40):
+            for x in range(80, 750, 40):
+                r, g, b = img.getpixel((x, y))
+                tot += (r + g + b) / 3
+                n += 1
+        mean = tot / n
+        if mean > 45.0:
+            return False
+        text = cov(841, 931, 92, 734)           # '…delete your current progress…' lines
+        cancel = cov(1005, 1086, 180, 360)      # Cancel  (left button)
+        confirm = cov(1005, 1086, 480, 700)     # Confirm (right button)
+        gap = cov(1005, 1086, 385, 455)         # between the two buttons
+        if text >= 0.10 and cancel >= 0.08 and confirm >= 0.05 and gap < 0.05:
+            log.info("load-account confirm detected "
+                     "(text=%.2f cancel=%.2f confirm=%.2f gap=%.2f mean=%.1f)",
+                     text, cancel, confirm, gap, mean)
+            return True
+        return False
+
+    def _world_looks_reached(self, img) -> bool:
+        """True when the post-login world view looks reached: the app is not on
+        a transition (splash) and no dialog is visible (parchment login/code or
+        the dark load-account confirm)."""
+        if img is None:
+            return False
+        if self._is_splash(img):
+            return False
+        if self._is_switch_account(img) or self._code_dialog_present(img):
+            return False
+        if self._is_load_confirm_dialog(img):
+            return False
+        return True
 
     def _wait_for_code_dialog(self, timeout: float = 20.0) -> bool:
         deadline = time.monotonic() + timeout
@@ -572,6 +681,8 @@ class EvonyController:
             return "load"
         if img is None:
             return "ambiguous"
+        if self._is_load_confirm_dialog(img):
+            return "load"  # dark overlay, not the parchment dialogs
         if not self._parchment_present(img):
             return "none"
         red = self._red_cancel_present(img)
@@ -619,8 +730,8 @@ class EvonyController:
 
     def _wait_for_world(self, timeout: float = 60.0) -> bool:
         """True once the post-login world view looks reached: no splash, no
-        parchment dialog, for two consecutive polls (or a world_view template
-        hit when vision is enabled)."""
+        parchment dialog, no dark load-account confirm, for two consecutive
+        polls (or a world_view template hit when vision is enabled)."""
         deadline = time.monotonic() + timeout
         calm = 0
         while time.monotonic() < deadline:
@@ -628,8 +739,7 @@ class EvonyController:
             if self._template_hit(raw, "world_view"):
                 log.info("world view confirmed by template")
                 return True
-            if img is not None and not self._is_splash(img) \
-                    and not self._parchment_present(img):
+            if self._world_looks_reached(img):
                 calm += 1
                 if calm >= 2:
                     log.info("world view reached (no splash/dialog)")
@@ -661,8 +771,19 @@ class EvonyController:
                 after_type()
             except Exception as exc:
                 log.warning("after_type hook failed: %s", exc)
-        log.info("tap confirm once")
-        self.t.tap(579, 1100)
+        self._tap_email_confirm()
+
+    def _tap_email_confirm(self) -> None:
+        """Tap the parchment email-entry Continue. Touch first on a neutral
+        parchment spot to finish any keyboard-dismiss animation, then press
+        (hold) the button — instant taps drop during that transition."""
+        try:
+            self.t.tap(414, 720)
+        except Exception:
+            pass
+        log.info("tap parchment neutral, then confirm")
+        time.sleep(0.6)
+        self.t.press(579, 1100, hold=0.25)
         time.sleep(2.8)
 
     def _code_spec(self) -> dict:
@@ -709,12 +830,102 @@ class EvonyController:
         log.info("tap code confirm %s,%s", confirm_x, confirm_y)
         self.t.tap(confirm_x, confirm_y)
 
+    def _load_confirm_point(self, default: tuple[int, int]) -> tuple[int, int]:
+        """Tap point for the Confirm button on the dark load-account dialog."""
+        if self.cal:
+            spec = (self.cal.screens.get("load_confirm") or {})
+            raw = ((spec.get("taps") or {}).get("confirm")
+                   or (self._code_spec().get("taps") or {}).get("load_confirm"))
+            if raw:
+                return int(raw["x"]), int(raw["y"])
+        return default
+
     def _confirm_load_account(self) -> None:
-        x, y = self._code_tap("load_confirm", (579, 1100))
+        x, y = self._load_confirm_point((579, 1100))
         log.info("waiting for load-account dialog")
         time.sleep(2.4)
         log.info("tap load-account confirm %s,%s", x, y)
         self.t.tap(x, y)
+
+    def _wait_for_load_confirm(self, timeout: float = 12.0) -> bool:
+        """True once the dark load-account confirm overlay appears."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            raw, img = self._grab_both()
+            if self._is_load_confirm_dialog(img):
+                return True
+            if self._template_hit(raw, "load_confirm"):
+                return True
+            time.sleep(1.0)
+        return False
+
+    def _load_confirm_name(self, checks: int = 1, interval: float = 0.5) -> str | None:
+        """OCR the account name off the dark load-account confirm, or None.
+
+        The ROI is the whole second text line ('…load the Lv30 account J.Blake');
+        we keep only the trailing name after the last 'account/los tokens ('cuenta'
+        in the Spanish rendering) and clean OCR garbage. The dialog animates in,
+        so on a mid-frame OCR we retry a few times and only return text that
+        reads like a plausible name. When the dialog is localized (it renders in
+        the language of the account being *loaded*), the English 'account' token
+        is absent and we return None — the caller then proceeds unverified, which
+        is safe because merely seeing the dialog already proves the typed email
+        was accepted.
+        """
+        if not self.v or not self.cal:
+            return None
+        spec = self.cal.screens.get("load_confirm") or {}
+        roi = spec.get("name_roi")
+        if not roi or len(roi) != 4:
+            return None
+        for attempt in range(checks):
+            try:
+                shot = self.t.screenshot()
+                text = self.v.ocr_region(shot, tuple(int(v) for v in roi))
+            except Exception as exc:
+                log.warning("load-account name OCR failed: %s", exc)
+                return None
+            text = re.sub(r"^.*\baccount\b\s*", "", text.strip().rstrip("?!.")).strip()
+            if self._plausible_name(text):
+                return text
+            if attempt + 1 < checks:
+                time.sleep(interval)
+        return None
+
+    @staticmethod
+    def _plausible_name(text: str) -> bool:
+        """A readable in-game name: not OCR garbage (like 'g P S e A e M e'),
+        has at least one real word (>=2 letters), and is not absurdly long."""
+        if not text or len(text) > 40:
+            return False
+        tokens = text.split()
+        if tokens and len(tokens) >= 3 and all(len(t) == 1 for t in tokens):
+            return False  # spaced single-letter garbage
+        return bool(re.search(r"[A-Za-z]{2,}", text))
+
+    def _accept_load_confirm(self, expected_name: str | None) -> tuple[bool, str | None]:
+        """Verify the load-account name (when known + calibratable) and tap Confirm.
+
+        Returns (ok, confirmed_name). Like _accept_login_prompt: when the name
+        cannot be read we proceed unverified, because merely *seeing* the dialog
+        proves the typed email was accepted. A readable name that mismatches the
+        expected member is the only hard refusal.
+        """
+        name = self._load_confirm_name(checks=3, interval=0.6)
+        if name is None:
+            log.warning("cannot read the load-account name (vision/calibration off "
+                        "or unreadable frame); proceeding unverified")
+            self._confirm_load_account()
+            return True, None
+        if expected_name and not _names_match(name, expected_name):
+            log.warning("load-account name '%s' does NOT match expected '%s'; refusing",
+                        name, expected_name)
+            return False, name
+        log.info("load-account name '%s'%s", name,
+                 f" matches expected '{expected_name}'"
+                 if expected_name else " (no expected check)")
+        self._confirm_load_account()
+        return True, name
 
     def _dialog_visible(self) -> bool:
         img = self._grab()
@@ -752,35 +963,46 @@ class EvonyController:
             raise CalibrationMissing("no calibration for screen 'email_login'")
         primary = self._login_icon_point()
         points: list[tuple[int, int]] = []
-        for point in (primary, (56, 250), (40, 236)):
+        for point in (primary, (44, 250), (56, 250), (40, 236)):
             if point not in points:
                 points.append(point)
-        log.info("login icon taps (px): %s", points)
+        log.info("login icon presses (px): %s", points)
         if bundle_id:
             self.t.launch(bundle_id)
         start = time.monotonic()
         deadline = start + LOGIN_GRACE_S
         last_tap = 0.0
         tap_count = 0
-        seen_splash = False
+        locate = 0
         while time.monotonic() < deadline:
             if self._dialog_visible():
                 return True
             now = time.monotonic()
-            img = self._grab()
-            if img is not None and not seen_splash and self._is_splash(img):
-                seen_splash = True
-                log.info("evony splash visible")
-            if now - last_tap >= 2.5:
-                x, y = points[tap_count % len(points)]
+            if now - last_tap >= 0.9:
+                # Prefer the live icon center from the template; fall back to the
+                # calibrated fixed points. Evony auto-logs-in as the previous user
+                # once the loading screen passes, so press early and often.
+                icon = self._find_login_icon()
+                if icon is not None:
+                    x, y = icon
+                    locate += 1
+                else:
+                    x, y = points[tap_count % len(points)]
                 tap_count += 1
-                log.info("login icon tap %s,%s #%s (+%.0fs)", x, y, tap_count, now - start)
+                log.info("login icon press %s,%s #%s%s (+%.0fs)",
+                         x, y, tap_count, " (located)" if locate else "", now - start)
                 try:
-                    self.t.tap(x, y)
+                    # Press (hold), not tap: the app drops instant taps while the
+                    # loading/connecting screen is still up, so the gold person icon
+                    # would otherwise never open the switch-account dialog.
+                    self.t.press(x, y, hold=0.4)
                 except Exception as exc:
-                    log.warning("login tap failed: %s", exc)
+                    log.warning("login press failed: %s", exc)
                 last_tap = now
-            time.sleep(0.5)
+            time.sleep(0.45)
+        if locate == 0:
+            log.warning("login icon was never located on the loading screen; "
+                        "fixed-point presses only")
         log.warning("switch-account dialog did not appear within %ss", LOGIN_GRACE_S)
         return False
 

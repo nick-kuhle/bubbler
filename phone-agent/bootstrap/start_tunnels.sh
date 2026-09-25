@@ -7,7 +7,7 @@
 #      SSH_USER (default mobile). The agent config.yaml must point at 127.0.0.1:27042/6000.
 set -e
 
-PHONE_IP="${PHONE_IP:-192.168.1.166}"
+PHONE_IP="${PHONE_IP:-192.168.12.162}"
 SSH_KEY="${SSH_KEY:-/tmp/opencode/bubbler_phone_ed25519}"
 SSH_USER="${SSH_USER:-mobile}"
 

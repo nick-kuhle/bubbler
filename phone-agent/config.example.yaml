@@ -14,6 +14,11 @@ phone:
   zxtouch_host: 127.0.0.1                 # ZXTouch rootless socket
   zxtouch_port: 6000
   zxtouch_template_dir: /var/jb/usr/libexec/bubbler/calibration
+  # Laptop-mode bridge to the phone's SSH (kill/relaunch Evony). On the phone
+  # (cutover) leave these empty/unset so the agent uses local uiopen/killall.
+  ssh_host: ""                # e.g. 192.168.x.x when the brain runs on this laptop
+  ssh_user: mobile
+  ssh_key: /tmp/opencode/bubbler_phone_ed25519
 
 vision:
   enabled: false                  # set true after calibration assets are captured

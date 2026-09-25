@@ -74,6 +74,16 @@ class ZXTouchClient:
         time.sleep(0.10)
         self._send(self.TOUCH, "10" + finger)
 
+    def press(self, x: int, y: int, hold: float = 0.4) -> None:
+        """Touch down, hold, up — needed where the game drops ultra-short taps
+        (e.g. the loading-screen login icon while the app is still connecting)."""
+        x10 = max(0, min(99999, int(round(x * 10))))
+        y10 = max(0, min(99999, int(round(y * 10))))
+        finger = f"{1:02d}{x10:05d}{y10:05d}"
+        self._send(self.TOUCH, "11" + finger)
+        time.sleep(hold)
+        self._send(self.TOUCH, "10" + finger)
+
     def screen_size(self) -> tuple[int, int]:
         self._send(13)
         line = self._line()[:-2].decode(errors="replace").split(";;")
@@ -133,7 +143,8 @@ class FridaTouch:
 
     def __init__(self, bundle_id: str, host: str = "127.0.0.1", port: int = 27042,
                  touch_host: str = "127.0.0.1", touch_port: int = 6000,
-                 timeout: float = 30):
+                 timeout: float = 30, ssh_host: str = "", ssh_user: str = "mobile",
+                 ssh_key: str = "/tmp/opencode/bubbler_phone_ed25519"):
         self.bundle_id = bundle_id
         self.host = host
         self.port = int(port)
@@ -143,6 +154,12 @@ class FridaTouch:
         self._script = None
         self._touch = ZXTouchClient(touch_host, touch_port, timeout)
         self._touch_template_dir = ""
+        # Laptop-mode helper: kill/relaunch Evony through the phone's SSH when a
+        # reachable host+key are configured; on-device (cutover) these are empty,
+        # so app control falls back to local `uiopen`/`killall`.
+        self.ssh_host = str(ssh_host or "")
+        self.ssh_user = str(ssh_user or "mobile")
+        self.ssh_key = Path(str(ssh_key)) if ssh_key else None
 
     def _ensure_script(self):
         if self._script is not None:
@@ -187,6 +204,10 @@ class FridaTouch:
         log.info("tap %s,%s", x, y)
         self._touch.tap(int(x), int(y))
 
+    def press(self, x: int, y: int, hold: float = 0.4) -> None:
+        log.info("press %s,%s (hold %ss)", x, y, hold)
+        self._touch.press(int(x), int(y), hold)
+
     def screen_size(self) -> tuple[int, int]:
         return 828, 1792
 
@@ -211,13 +232,14 @@ class FridaTouch:
         """Kill Evony, then start it without waiting for the splash to finish."""
         if bundle_id != self.bundle_id:
             raise FridaDown(f"transport configured for {self.bundle_id}, not {bundle_id}")
-        close_app(bundle_id)
+        close_app(bundle_id, host=self.ssh_host, user=self.ssh_user, key=self.ssh_key)
         time.sleep(0.5)
-        key = Path("/tmp/opencode/bubbler_phone_ed25519")
         cmd = ["uiopen", "--bundleid", bundle_id]
-        if key.exists():
-            cmd = ["ssh", "-i", str(key), "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
-                   "mobile@192.168.1.166", f"uiopen --bundleid {bundle_id}"]
+        if self.ssh_key is not None and self.ssh_key.exists() and self.ssh_host:
+            cmd = ["ssh", "-i", str(self.ssh_key), "-o", "BatchMode=yes",
+                   "-o", "ConnectTimeout=6",
+                   f"{self.ssh_user}@{self.ssh_host}",
+                   f"uiopen --bundleid {bundle_id}"]
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def wait_for_template(self, template_name: str, timeout: float = 30) -> bool:
@@ -278,7 +300,7 @@ class FridaTouch:
     def force_close(self, bundle_id: str) -> None:
         if bundle_id != self.bundle_id:
             raise FridaDown(f"transport configured for {self.bundle_id}, not {bundle_id}")
-        close_app(bundle_id)
+        close_app(bundle_id, host=self.ssh_host, user=self.ssh_user, key=self.ssh_key)
         self._script = None
         self._session = None
         self._touch.close()
@@ -299,12 +321,12 @@ class FridaTouch:
         return killed
 
 
-def close_app(bundle_id: str) -> None:
+def close_app(bundle_id: str, host: str = "", user: str = "mobile",
+              key: Path | None = None) -> None:
     """Kill Evony once, then wait until it is gone."""
     leaf = bundle_id.rsplit(".", 1)[-1]
     names = [bundle_id, leaf, leaf.capitalize(), "Evony"]
-    key = Path("/tmp/opencode/bubbler_phone_ed25519")
-    if key.exists():
+    if key is not None and key.exists() and host:
         remote = " ; ".join(f"killall -9 {n} >/dev/null 2>&1" for n in names)
         remote += (
             '; i=0; while [ $i -lt 8 ]; do '
@@ -313,7 +335,7 @@ def close_app(bundle_id: str) -> None:
         )
         subprocess.run(
             ["ssh", "-i", str(key), "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
-             "mobile@192.168.1.166", remote],
+             f"{user}@{host}", remote],
             capture_output=True, check=False,
         )
         time.sleep(0.3)
