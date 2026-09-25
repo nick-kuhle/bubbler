@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Verbindung testen",
-    "body": "Führt einen schnellen Konnektivitätscheck zwischen unserem Agenten und dem Server aus.",
+    "body": "Führt einen schnellen Verbindungstest auf unseren Servern durch.",
     "run": "verbindung testen",
     "running": "testen…",
     "pending": "Warte auf den Agenten…",
@@ -213,7 +213,7 @@
     "startError": "Der Check konnte nicht gestartet werden."
   },
   "agentStatus": {
-    "title": "Handy-Agent",
+    "title": "Serverstatus",
     "online": "online",
     "offline": "offline",
     "never": "noch nie gesehen",

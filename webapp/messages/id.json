@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Tes koneksi",
-    "body": "Menjalankan cek konektivitas cepat antara agen kami dan server.",
+    "body": "Menjalankan pemeriksaan konektivitas cepat di server kami.",
     "run": "tes koneksi",
     "running": "mengetes…",
     "pending": "Menunggu agen…",
@@ -213,7 +213,7 @@
     "startError": "Tidak bisa memulai cek."
   },
   "agentStatus": {
-    "title": "Agen ponsel",
+    "title": "Status server",
     "online": "online",
     "offline": "offline",
     "never": "belum pernah terdengar",

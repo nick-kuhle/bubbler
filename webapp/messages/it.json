@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Test di connessione",
-    "body": "Esegue un rapido controllo di connettività tra il nostro agente e il server.",
+    "body": "Esegue un rapido controllo di connettività sui nostri server.",
     "run": "testa connessione",
     "running": "test…",
     "pending": "In attesa dell'agente…",
@@ -213,7 +213,7 @@
     "startError": "Impossibile avviare il controllo."
   },
   "agentStatus": {
-    "title": "Agente del telefono",
+    "title": "Stato del server",
     "online": "online",
     "offline": "offline",
     "never": "mai sentito",

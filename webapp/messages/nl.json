@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Verbinding testen",
-    "body": "Voert een snelle connectiviteitscheck uit tussen onze agent en de server.",
+    "body": "Voert een snelle connectiviteitscontrole uit op onze servers.",
     "run": "verbinding testen",
     "running": "testen…",
     "pending": "Wachten op de agent…",
@@ -213,7 +213,7 @@
     "startError": "De check kon niet gestart worden."
   },
   "agentStatus": {
-    "title": "Telefoonagent",
+    "title": "Serverstatus",
     "online": "online",
     "offline": "offline",
     "never": "nog nooit van gehoord",

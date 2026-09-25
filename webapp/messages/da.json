@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Test forbindelse",
-    "body": "Kører et hurtigt forbindelsestjek mellem vores agent og serveren.",
+    "body": "Kører et hurtigt forbindelsestjek på vores servere.",
     "run": "test forbindelse",
     "running": "tester…",
     "pending": "Venter på agenten…",
@@ -213,7 +213,7 @@
     "startError": "Kunne ikke starte tjekket."
   },
   "agentStatus": {
-    "title": "Telefonagent",
+    "title": "Serverstatus",
     "online": "online",
     "offline": "offline",
     "never": "aldrig hørt fra",

@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Bağlantı testi",
-    "body": "Aracımız ile sunucu arasında hızlı bir bağlantı kontrolü yapar.",
+    "body": "Sunucularımızda hızlı bir bağlantı kontrolü çalıştırır.",
     "run": "bağlantıyı test et",
     "running": "test ediliyor…",
     "pending": "Aracı bekleniyor…",
@@ -213,7 +213,7 @@
     "startError": "Kontrol başlatılamadı."
   },
   "agentStatus": {
-    "title": "Telefon aracısı",
+    "title": "Sunucu durumu",
     "online": "çevrimiçi",
     "offline": "çevrimdışı",
     "never": "hiç haber alınmadı",

@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Test conexiune",
-    "body": "Rulează o verificare rapidă de conectivitate între agentul nostru și server.",
+    "body": "Rulează o verificare rapidă a conexiunii pe serverele noastre.",
     "run": "testează conexiunea",
     "running": "se testează…",
     "pending": "Așteptăm agentul…",
@@ -213,7 +213,7 @@
     "startError": "Nu am putut porni verificarea."
   },
   "agentStatus": {
-    "title": "Agentul telefonului",
+    "title": "Starea serverului",
     "online": "online",
     "offline": "offline",
     "never": "niciodată auzit",

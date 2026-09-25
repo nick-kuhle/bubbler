@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Teste de conexão",
-    "body": "Faz uma verificação rápida de conectividade entre nosso agente e o servidor.",
+    "body": "Executa uma verificação rápida de conectividade em nossos servidores.",
     "run": "testar conexão",
     "running": "testando…",
     "pending": "Esperando o agente…",
@@ -213,7 +213,7 @@
     "startError": "Não foi possível iniciar a verificação."
   },
   "agentStatus": {
-    "title": "Agente do celular",
+    "title": "Status do servidor",
     "online": "online",
     "offline": "offline",
     "never": "nunca visto",

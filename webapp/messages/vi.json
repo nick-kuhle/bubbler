@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Kiểm tra kết nối",
-    "body": "Chạy kiểm tra kết nối nhanh giữa tác tử của chúng mình và máy chủ.",
+    "body": "Chạy kiểm tra kết nối nhanh trên máy chủ của chúng tôi.",
     "run": "kiểm tra kết nối",
     "running": "đang kiểm tra…",
     "pending": "Đang chờ tác tử…",
@@ -213,7 +213,7 @@
     "startError": "Không khởi động được kiểm tra."
   },
   "agentStatus": {
-    "title": "Tác tử điện thoại",
+    "title": "Trạng thái máy chủ",
     "online": "online",
     "offline": "offline",
     "never": "chưa từng nghe tin",

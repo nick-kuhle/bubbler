@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Test connection",
-    "body": "Runs a quick connectivity check between our agent and the server.",
+    "body": "Runs a quick connectivity on our servers.",
     "run": "test connection",
     "running": "testing…",
     "pending": "Waiting for the agent…",
@@ -213,7 +213,7 @@
     "startError": "Couldn't start the check."
   },
   "agentStatus": {
-    "title": "Phone agent",
+    "title": "Server Status",
     "online": "online",
     "offline": "offline",
     "never": "never heard from",

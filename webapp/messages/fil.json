@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "I-test ang koneksyon",
-    "body": "Nagpapatakbo ng mabilisang connectivity check sa pagitan ng aming agent at ng server.",
+    "body": "Nagsasagawa ng mabilisang pagsusuri ng koneksyon sa aming mga server.",
     "run": "i-test ang koneksyon",
     "running": "tine-test…",
     "pending": "Hinihintay ang agent…",
@@ -213,7 +213,7 @@
     "startError": "Hindi masimulan ang check."
   },
   "agentStatus": {
-    "title": "Phone agent",
+    "title": "Katayuan ng server",
     "online": "online",
     "offline": "offline",
     "never": "hindi pa naririnig kailanman",

@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Testa anslutning",
-    "body": "Kör en snabb anslutningskoll mellan vår agent och servern.",
+    "body": "Utför en snabb anslutningskontroll på våra servrar.",
     "run": "testa anslutning",
     "running": "testar…",
     "pending": "Väntar på agenten…",
@@ -213,7 +213,7 @@
     "startError": "Kunde inte starta kollen."
   },
   "agentStatus": {
-    "title": "Telefonagent",
+    "title": "Serverstatus",
     "online": "online",
     "offline": "offline",
     "never": "aldrig hört av sig",

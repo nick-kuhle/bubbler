@@ -199,7 +199,7 @@
   },
   "test": {
     "title": "Uji sambungan",
-    "body": "Menjalankan semakan konektiviti pantas antara ejen kami dan pelayan.",
+    "body": "Menjalankan semakan sambungan pantas pada pelayan kami.",
     "run": "uji sambungan",
     "running": "menguji…",
     "pending": "Menunggu ejen…",
@@ -213,7 +213,7 @@
     "startError": "Tidak dapat memulakan semakan."
   },
   "agentStatus": {
-    "title": "Ejen telefon",
+    "title": "Status pelayan",
     "online": "dalam talian",
     "offline": "luar talian",
     "never": "tidak pernah kedengaran",

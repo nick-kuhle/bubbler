@@ -253,7 +253,7 @@ function AdminView({
             <div className="section-head" style={{ marginBottom: 0 }}>
               <span className="tile sm" aria-hidden>📡</span>
               <div>
-                <h3>phone agent</h3>
+                <h3>Server Status</h3>
                 <p className="muted" style={{ margin: 0 }}>long-polls every ~1s; claims jobs by handoff</p>
               </div>
             </div>
