@@ -114,7 +114,15 @@ export async function ensureUser(email: string, isOperator = false): Promise<Cur
     row = await d.get("SELECT * FROM users WHERE email = ?", [e]);
     created = true;
   }
-  const user = rowToUser(row!);
+  // The operator is whoever the AUTH_OPERATOR env names — upgrade an existing (or
+  // dot-renamed) row so the flag is never stale when the env is set after signup.
+  const existing = row!;
+  const opRaw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.["AUTH_OPERATOR"];
+  if (opRaw && e === opRaw.trim().toLowerCase() && Number(existing.is_operator) !== 1) {
+    await d.run("UPDATE users SET is_operator = 1 WHERE id = ?", [String(existing.id)]);
+    existing.is_operator = 1;
+  }
+  const user = rowToUser(existing);
   // link the session
   const token = newToken();
   await d.run(
