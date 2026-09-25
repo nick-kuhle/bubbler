@@ -94,10 +94,13 @@ phone-agent/             Python agent, Evony orchestration and transport (target
   the profile before reporting "signed in as {name}".
 - Scheduled bubble application, screenshot calibration and shield verification still need
   end-to-end tests before unattended use.
-- **Production blocker:** app sign-in currently creates a session for anyone who submits an
-  allowed email; it does *not* send/verify a magic link. Do not expose real member accounts
-  on a public deployment until this is fixed. Code delivery also temporarily stores codes
-  in a DB job; see [security notes](docs/05-security.md).
+- **App sign-in is now ownership-verified:** the homepage offers *create an account* /
+  *log in*; either path emails a 6-digit one-time code (`POST /api/auth/code`) that only
+  `POST /api/auth/login` accepts to start a session. Verification both logs in existing
+  users and registers new emails (routed to the Link-Account wizard). Delivery needs a
+  free-tier mail provider (`RESEND_API_KEY`+`MAIL_FROM` or SMTP vars); **without one,
+  production login fails closed, and the invite allowlist `AUTH_SEED` is recommended on
+  a public deployment.**
 
 Next: [07 — cutover plan](docs/07-cutover.md). Preserve the working local setup until every
 gate there passes. A GitHub PAT is not needed for this repository session; never put a PAT,

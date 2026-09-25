@@ -1,11 +1,13 @@
 # Web app (Next.js UI + API)
 
 Evony email/code **linking** has been successfully tested with new users and different
-emails in the current setup (operator report). That is distinct from web-app **sign-in**;
-the present `/api/auth/login` trusts an email string and does not send a magic link. Do
-not make a public Vercel deployment with real member data until app authentication is
-fixed. See [status](../README.md), [security](../docs/05-security.md) and the
-[cutover plan](../docs/07-cutover.md).
+emails in the current setup (operator report). That is distinct from web-app **sign-in**,
+which is now owned via emailed one-time codes: `POST /api/auth/code` mails a 6-digit OTP
+and `POST /api/auth/login` starts a session only after it verifies (registering a
+brand-new email and routing it to the Link-Account wizard). Delivery needs a provider —
+Resend or any SMTP relay; see the env table below. With no provider configured, production
+login fails closed (`503`) and local dev logs the code. See [status](../README.md),
+[security](../docs/05-security.md) and the [cutover plan](../docs/07-cutover.md).
 
 ## Running locally for development
 
@@ -28,16 +30,20 @@ pointing the build at a production Postgres database.
 Deploy the GitHub revision to Vercel with project **Root Directory `webapp`**. Provision a
 persistent managed Postgres database and provide `DATABASE_URL` (or `POSTGRES_URL`) at
 build *and* runtime, rather than using the default SQLite fallback on an ephemeral
-serverless filesystem. Set `AUTH_OPERATOR` and a required invite policy (`AUTH_SEED`)
-**after implementing verified email sign-in**, plus a separate `AGENT_BEARER_TOKEN` for
-phone-to-cloud calls. Vercel Blob evidence uses `BLOB_READ_WRITE_TOKEN` and currently
-returns public image URLs; decide access/retention before storing sensitive evidence.
-Use distinct staging and production environments and keep all values out of Git/PRs.
+serverless filesystem. For sign-in email, set an allowlist (`AUTH_SEED`) and one mail
+provider — Resend (`RESEND_API_KEY`, `MAIL_FROM`) or SMTP (`SMTP_HOST`/`SMTP_PORT`/
+`SMTP_USER`/`SMTP_PASS`, `MAIL_FROM`). Keep `AUTH_OPERATOR` for the admin role, plus a
+separate `AGENT_BEARER_TOKEN` for phone-to-cloud calls. Vercel Blob evidence uses
+`BLOB_READ_WRITE_TOKEN` and currently returns public image URLs; decide
+access/retention before storing sensitive evidence. Use distinct staging and production
+environments and keep all values out of Git/PRs.
 
 ## Active API contract (see `../docs/02-architecture.md`)
 
 | Method | Path | Purpose |
 |---|---|---|
+| `POST` | `/api/auth/code` | Request a one-time login code (mailed via Resend/SMTP; dev logs it when no provider is set); invite-gated by `AUTH_SEED` |
+| `POST` | `/api/auth/login` | Verify the emailed code, create-or-login the user, set the session cookie; returns `created` for fresh accounts |
 | `GET` | `/api/agent/events?hold=45` | Phone-initiated long-poll, returns `{ok,event}`; stamps the heartbeat from `v`/`host`/`pid`; auth bearer |
 | `GET` | `/api/agent/status` | Phone agent liveness (online / last seen / version) for the Test connection card; web session |
 | `POST` | `/api/agent/links/{link_id}/status` | Phone reports wizard link progress; auth bearer |
@@ -51,7 +57,8 @@ Use distinct staging and production environments and keep all values out of Git/
 | `POST` | `/api/runs/now`, `/api/schedule` | Queue a manual run / manage slots; web session |
 
 Data tables are `users`, `sessions`, `slots` (one UTC weekday/time per row),
-`link_sessions`, `test_sessions`, `agent_health` (heartbeat), `jobs` and `runs`. There is
+`link_sessions`, `test_sessions`, `agent_health` (heartbeat), `email_codes` (hashed login
+OTPs), `jobs` and `runs`. There is
 no `/jobs/due` endpoint or separate
 `schedules`/`re_link` table in the current implementation. Jobs are currently marked
 `claimed` without a lease/retry; see cutover gates before relying on unattended work.

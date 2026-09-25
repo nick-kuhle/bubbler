@@ -5,19 +5,25 @@ planned web app will be internet-facing. **Do not expose real member accounts in
 production until app authentication and code retention are fixed.** Working Evony
 email/code linking is not proof that web sign-in is secure.
 
-## Authentication: blocking issue
+## Authentication
 
-`POST /api/auth/login` currently accepts an email and immediately issues a session cookie;
-it does **not** email a one-time link or verify ownership of the address. `AUTH_SEED` can
-restrict which addresses are accepted, but when unset it accepts *any* email, and a known
-allowed/`AUTH_OPERATOR` address could be impersonated. `verifyBearer()` for agent routes
-also accepts a valid user session token as well as `AGENT_BEARER_TOKEN`.
+Web sign-in is now ownership-verified. `POST /api/auth/code` emails a 6-digit one-time
+code (10-minute TTL, single use, stored only as a SHA-256 hash in `email_codes`,
+constant-time compare, 5-guess cap, per-email 30s cooldown plus a 10-minute window rate
+limit), and `POST /api/auth/login` issues the session cookie **only after** that code
+verifies. A verified code creates the account on first use — the response's `created`
+flag routes brand-new users to the Link-Account wizard — and logs in existing users. The
+session table/cookie transport is unchanged, and `verifyBearer()` for agent routes still
+accepts a valid user session token alongside `AGENT_BEARER_TOKEN`.
 
-Before a public Vercel release with real data: implement and test real email ownership
-verification (one-time, short-lived magic link or equivalent), require an explicit invite
-allowlist, protect operator-only actions, and make the agent endpoints accept *only* a
-separate agent credential with rotation/revocation. Do not use Vercel deployment protection
-as a substitute for user authentication. A GitHub PAT is **not** an agent token.
+Delivery requires a mail provider (100%-free starter tiers are plenty for a small circle):
+Resend (`RESEND_API_KEY` + `MAIL_FROM`) or any SMTP relay (`SMTP_HOST`/`SMTP_PORT`/
+`SMTP_USER`/`SMTP_PASS` + `MAIL_FROM`). With neither configured, production fails closed
+(`503 email-not-configured`) and local dev logs the code instead of sending. Set
+`AUTH_SEED` (comma-separated allowlist) on a public deployment so only members may request
+codes, keep `AUTH_OPERATOR` set for the admin, and get `AGENT_BEARER_TOKEN` rotation in
+place before unattended phone use. Do not use Vercel deployment protection as a
+substitute for user authentication, and never log code values, tokens or emails in traces/PRs.
 
 ## Code handling: correct the privacy promise
 
@@ -65,7 +71,7 @@ mode-0600 `config.yaml` and Vercel environment settings, not source control.
 
 ## Risk notes
 
-Knowing an allowed email address currently grants a login without inbox access; a stolen
-agent credential can claim jobs/control the game. A dead phone misses work. Automated gameplay also
+An allowed email no longer logs you in without inbox access, but a stolen agent
+credential can still claim jobs/control the game. A dead phone misses work. Automated gameplay also
 violates Evony's Terms of Service and has account-ban risk. Limit use to the trusted circle;
 no open signup or commercial distribution.
