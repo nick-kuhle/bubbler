@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 
-import { useLocale, useTranslations } from "@/lib/i18n";
+import { useLocale, useTranslations } from "next-intl";
 
 type Mode = "register" | "login";
 

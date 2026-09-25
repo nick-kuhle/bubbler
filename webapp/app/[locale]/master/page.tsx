@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "@/lib/i18n";
+import { Link } from "@/src/i18n/navigation";
 
 type Agent = {
   online: boolean; last_seen_at: string | null; last_event_at: string | null;

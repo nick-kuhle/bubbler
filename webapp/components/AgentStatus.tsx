@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Dict } from "@/lib/i18n";
-
-type Props = { dict: Dict };
+import { useTranslations } from "next-intl";
 
 type AgentData = {
   ok: boolean;
@@ -24,8 +22,8 @@ function ago(ms: number): string {
 }
 
 /** Small liveness chip fed by /api/agent/status (the phone's own heartbeat). */
-export default function AgentStatus({ dict }: Props) {
-  const d = dict.agentStatus;
+export default function AgentStatus() {
+  const d = useTranslations("agentStatus");
   const [agent, setAgent] = useState<AgentData | null>(null);
 
   useEffect(() => {
@@ -50,15 +48,15 @@ export default function AgentStatus({ dict }: Props) {
   }, []);
 
   if (!agent) return null;
-  const when = (ts: string | null) => (ts ? (Date.now() - Date.parse(ts) < 45_000 ? d.now : `${ago(Date.now() - Date.parse(ts))}`) : "");
-  const lastSeen = agent.last_seen_at ? d.lastSeen.replace("{ago}", when(agent.last_seen_at)) : d.never;
-  const claimed = agent.last_event_at ? d.lastClaimed.replace("{ago}", when(agent.last_event_at)) : null;
+  const when = (ts: string | null) => (ts ? (Date.now() - Date.parse(ts) < 45_000 ? d("now") : `${ago(Date.now() - Date.parse(ts))}`) : "");
+  const lastSeen = agent.last_seen_at ? d("lastSeen", { ago: when(agent.last_seen_at) }) : d("never");
+  const claimed = agent.last_event_at ? d("lastClaimed", { ago: when(agent.last_event_at) }) : null;
 
   return (
     <p className={`agent-chip ${agent.online ? "ok" : "warn"}`} style={{ margin: "0.6rem 0 0" }}>
       <span className="dot" aria-hidden />
-      <strong>{d.title}:</strong> {agent.online ? d.online : d.offline} · {lastSeen}
-      {agent.version ? ` · ${d.version.replace("{v}", agent.version)}` : ""}
+      <strong>{d("title")}:</strong> {agent.online ? d("online") : d("offline")} · {lastSeen}
+      {agent.version ? ` · ${d("version", { v: agent.version })}` : ""}
       {claimed ? ` · ${claimed}` : ""}
     </p>
   );

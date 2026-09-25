@@ -156,7 +156,14 @@
     "linkAgain": "link another account",
     "step": "step",
     "of": "of",
-    "stepsShort": ["Account", "Game", "Code", "Link", "Plan", "Done"],
+    "stepsShort": [
+      "Account",
+      "Game",
+      "Code",
+      "Link",
+      "Plan",
+      "Done"
+    ],
     "step1Title": "Your Evony account",
     "step1Body": "Enter the account LOL should shield — your sign-in email is already saved.",
     "accountLabel": "Evony account ID",
@@ -186,7 +193,9 @@
     "failedBody": "Something went wrong while linking. Try again.",
     "expiredTitle": "Link expired",
     "expiredBody": "This link ran out of time.",
-    "retry": "start over"
+    "retry": "start over",
+    "welcomeKicker": "Welcome aboard",
+    "welcomeBody": "You're in! Link your Evony account below so the shield lands on the right city. Takes about a minute."
   },
   "test": {
     "title": "Test connection",

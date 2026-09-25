@@ -1,16 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
+
 import { useRouter } from "@/src/i18n/navigation";
-import type { Dict } from "@/lib/i18n";
 
-type Props = {
-  dict: Dict;
-  onUnlinked?: () => void;
-};
-
-export default function UnlinkButton({ dict, onUnlinked }: Props) {
-  const d = dict.dashboard;
+export default function UnlinkButton({ onUnlinked }: { onUnlinked?: () => void }) {
+  const d = useTranslations("dashboard");
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -36,9 +32,9 @@ export default function UnlinkButton({ dict, onUnlinked }: Props) {
   return (
     <div>
       <button type="button" className="btn-danger-soft" onClick={() => void unlink()} disabled={busy}>
-        {busy ? d.unlinking : d.unlink}
+        {busy ? d("unlinking") : d("unlink")}
       </button>
-      {error && <p className="warn" role="alert">{d.unlinkError}</p>}
+      {error && <p className="warn" role="alert">{d("unlinkError")}</p>}
     </div>
   );
 }

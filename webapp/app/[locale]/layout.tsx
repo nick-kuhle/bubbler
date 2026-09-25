@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { NextIntlClientProvider } from "next-intl";
+import { notFound } from "next/navigation";
+import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 
 import SiteChrome from "@/components/SiteChrome";
-import { Lang, t } from "@/lib/i18n";
-import { routing } from "@/src/i18n/routing";
+import { isRtlLocale, routing } from "@/src/i18n/routing";
 
 import "../globals.css";
 
 // Self-hosted via @fontsource (bundled at build time — no Google Fonts fetch,
-// so builds work offline and pages never wait on a font CDN).
+// so builds work offline and pages never wait on a font CDN). Latin subsets only;
+// non-Latin scripts (العربية, 中文, 日本語, 한국어, हिन्दी, Русский) gracefully
+// fall back to the system font stack for the display face.
 const display = localFont({
   src: [
     { path: "../../node_modules/@fontsource/baloo-2/files/baloo-2-latin-600-normal.woff2", weight: "600" },
@@ -56,10 +58,10 @@ export async function generateMetadata({
     icons: { icon: "/images/logo.png" },
     alternates: {
       canonical: `${baseUrl}/${locale}`,
+      // hreflang for every served locale, derived from the one routing list.
       languages: {
-        en: `${baseUrl}/en`,
-        es: `${baseUrl}/es`,
-        "x-default": `${baseUrl}/en`,
+        ...Object.fromEntries(routing.locales.map((l) => [l, `${baseUrl}/${l}`])),
+        "x-default": `${baseUrl}/${routing.defaultLocale}`,
       },
     },
   };
@@ -73,12 +75,12 @@ export default async function LocaleLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
   const messages = await getMessages();
-  const dict = t(locale as Lang);
 
   return (
-    <html lang={locale} className={`${display.variable} ${nunito.variable}`}>
+    <html lang={locale} dir={isRtlLocale(locale) ? "rtl" : "ltr"} className={`${display.variable} ${nunito.variable}`}>
       <body className={nunito.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <div className="bubbles" aria-hidden>
@@ -87,7 +89,7 @@ export default async function LocaleLayout({
             <span /><span /><span /><span /><span />
             <span /><span /><span />
           </div>
-          <SiteChrome dict={dict}>{children}</SiteChrome>
+          <SiteChrome>{children}</SiteChrome>
         </NextIntlClientProvider>
       </body>
     </html>

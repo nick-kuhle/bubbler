@@ -193,7 +193,9 @@
     "failedBody": "Algo salió mal al vincular. Inténtalo de nuevo.",
     "expiredTitle": "Enlace caducado",
     "expiredBody": "Este enlace se quedó sin tiempo.",
-    "retry": "empezar de nuevo"
+    "retry": "empezar de nuevo",
+    "welcomeKicker": "¡Bienvenido a bordo!",
+    "welcomeBody": "¡Ya estás dentro! Enlaza tu cuenta de Evony abajo para que el escudo aterrice en la ciudad correcta. Tarda como un minuto."
   },
   "test": {
     "title": "Probar conexión",

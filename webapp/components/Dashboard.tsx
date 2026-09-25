@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, type Dict } from "@/lib/i18n";
+import { useTranslations } from "next-intl";
+
+import { Link } from "@/src/i18n/navigation";
 import UnlinkButton from "@/components/UnlinkButton";
 import TestConnection from "@/components/TestConnection";
 import AgentStatus from "@/components/AgentStatus";
-import { GEMS_72H } from "@/lib/i18n";
+import { GEMS_72H } from "@/lib/constants";
 import SlotsEditor, {
   EditSlot,
   MAX_SLOTS,
@@ -99,8 +101,9 @@ function ShieldRing({ hours, max = 72 }: { hours: number; max?: number }) {
   );
 }
 
-export default function Dashboard({ dict }: { dict: Dict }) {
-  const d = dict.dashboard;
+export default function Dashboard() {
+  const d = useTranslations("dashboard");
+  const ta = useTranslations("agentStatus");
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
   const [slots, setSlots] = useState<EditSlot[]>([]);
   const [gemAck, setGemAck] = useState(true);
@@ -154,7 +157,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
   /** Replace-all save: the editor's rows ARE the user's schedule now. */
   async function save(): Promise<boolean> {
     if (!slotsAreValid(slots)) {
-      setEdit({ busy: false, msg: slots.length === 0 ? d.emptySlots : d.badTime, error: true });
+      setEdit({ busy: false, msg: slots.length === 0 ? d("emptySlots") : d("badTime"), error: true });
       return false;
     }
     setEdit({ busy: true, msg: null, error: false });
@@ -174,14 +177,14 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         }),
       });
       if (!r.ok) {
-        setEdit({ busy: false, msg: d.saveError, error: true });
+        setEdit({ busy: false, msg: d("saveError"), error: true });
         return false;
       }
-      setEdit({ busy: false, msg: d.saved, error: false });
+      setEdit({ busy: false, msg: d("saved"), error: false });
       window.setTimeout(() => void refresh(), 400);
       return true;
     } catch {
-      setEdit({ busy: false, msg: d.saveError, error: true });
+      setEdit({ busy: false, msg: d("saveError"), error: true });
       return false;
     }
   }
@@ -196,10 +199,10 @@ export default function Dashboard({ dict }: { dict: Dict }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ active: false }),
         });
-        setEdit({ busy: false, msg: r.ok ? d.saved : d.saveError, error: !r.ok });
+        setEdit({ busy: false, msg: r.ok ? d("saved") : d("saveError"), error: !r.ok });
         window.setTimeout(() => void refresh(), 400);
       } catch {
-        setEdit({ busy: false, msg: d.saveError, error: true });
+        setEdit({ busy: false, msg: d("saveError"), error: true });
       }
       return;
     }
@@ -216,17 +219,17 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         body: JSON.stringify({ email: profile.email, evony_name: profile.name }),
       });
       if (r.status === 409) {
-        setProfile((p) => ({ ...p, busy: false, msg: d.profileEmailTaken, error: true }));
+        setProfile((p) => ({ ...p, busy: false, msg: d("profileEmailTaken"), error: true }));
         return;
       }
       if (!r.ok) {
-        setProfile((p) => ({ ...p, busy: false, msg: d.profileError, error: true }));
+        setProfile((p) => ({ ...p, busy: false, msg: d("profileError"), error: true }));
         return;
       }
-      setProfile((p) => ({ ...p, busy: false, msg: d.profileSaved, error: false }));
+      setProfile((p) => ({ ...p, busy: false, msg: d("profileSaved"), error: false }));
       window.setTimeout(() => void refresh(), 300);
     } catch {
-      setProfile((p) => ({ ...p, busy: false, msg: d.profileError, error: true }));
+      setProfile((p) => ({ ...p, busy: false, msg: d("profileError"), error: true }));
     }
   }
 
@@ -252,7 +255,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
   if (load.kind === "loading") {
     return (
       <section className="card" style={{ maxWidth: 620, margin: "4rem auto" }}>
-        <p className="muted">{d.loading}</p>
+        <p className="muted">{d("loading")}</p>
       </section>
     );
   }
@@ -260,18 +263,18 @@ export default function Dashboard({ dict }: { dict: Dict }) {
   if (load.kind === "error" || !me) {
     return (
       <section className="card" style={{ maxWidth: 620, margin: "4rem auto" }}>
-        <h2>{d.loadError}</h2>
-        <p className="muted">{d.notSignedIn}</p>
+        <h2>{d("loadError")}</h2>
+        <p className="muted">{d("notSignedIn")}</p>
         <div className="row" style={{ marginTop: "1rem" }}>
-          <Link className="btn" href="/">{d.signIn}</Link>
-          <Link className="btn" href="/wizard">{d.goWizard}</Link>
-          <button onClick={() => { setLoad({ kind: "loading" }); void refresh(); }}>{d.retry}</button>
+          <Link className="btn" href="/">{d("signIn")}</Link>
+          <Link className="btn" href="/wizard">{d("goWizard")}</Link>
+          <button onClick={() => { setLoad({ kind: "loading" }); void refresh(); }}>{d("retry")}</button>
         </div>
       </section>
     );
   }
 
-  const roleBadge = me.user.is_operator ? d.roleOperator : d.roleMember;
+  const roleBadge = me.user.is_operator ? d("roleOperator") : d("roleMember");
   const remaining = me.last_run?.shield_hours_remaining ?? 0;
 
   return (
@@ -285,15 +288,15 @@ export default function Dashboard({ dict }: { dict: Dict }) {
             <div>
               <p className="kicker">{roleBadge} · {me.user.evony_name}</p>
               <h1 className="title-pop font-display" style={{ margin: "0.15rem 0 0", fontSize: "clamp(1.7rem, 4vw, 2.6rem)" }}>
-                {d.title}
+                {d("title")}
               </h1>
-              <p className="muted" style={{ margin: "0.25rem 0 0", maxWidth: 460 }}>{d.intro}</p>
+              <p className="muted" style={{ margin: "0.25rem 0 0", maxWidth: 460 }}>{d("intro")}</p>
               <div className="row" style={{ marginTop: "0.55rem" }}>
                 <span className={`badge ${remaining > 1 ? "ok" : "warn"}`}>
-                  {remaining > 1 ? `${remaining.toFixed(0)}h shield` : d.neverRun}
+                  {remaining > 1 ? `${remaining.toFixed(0)}h shield` : d("neverRun")}
                 </span>
-                <span className="badge">{d.gems72}</span>
-                <span className="badge ok">{d.shield72}</span>
+                <span className="badge">{d("gems72")}</span>
+                <span className="badge ok">{d("shield72")}</span>
               </div>
             </div>
           </div>
@@ -305,22 +308,22 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         <div className="card stat">
           <span className="tile sun sm" aria-hidden>💎</span>
           <div>
-            <p className="lbl">{d.gemsCol}</p>
+            <p className="lbl">{d("gemsCol")}</p>
             <p className="val">2,500</p>
           </div>
         </div>
         <div className="card stat">
           <span className="tile sm" aria-hidden>🛡️</span>
           <div>
-            <p className="lbl">{d.lastRun}</p>
+            <p className="lbl">{d("lastRun")}</p>
             <p className="val">{remaining > 0 ? `${remaining.toFixed(1)}h` : "—"}</p>
           </div>
         </div>
         <div className="card stat">
           <span className="tile green sm" aria-hidden>⏰</span>
           <div>
-            <p className="lbl">{d.runTitle}</p>
-            <p className="val">{next ? countdown(nextTs - nowTs) : d.never}</p>
+            <p className="lbl">{d("runTitle")}</p>
+            <p className="val">{next ? countdown(nextTs - nowTs) : d("never")}</p>
           </div>
         </div>
       </div>
@@ -330,12 +333,12 @@ export default function Dashboard({ dict }: { dict: Dict }) {
         <div className="section-head">
           <span className="tile sm" aria-hidden>😊</span>
           <div>
-            <h3>{d.profileTitle}</h3>
-            <p className="muted">{d.profileBody}</p>
+            <h3>{d("profileTitle")}</h3>
+            <p className="muted">{d("profileBody")}</p>
           </div>
         </div>
         <label className="field">
-          <span>{d.emailLabel}</span>
+          <span>{d("emailLabel")}</span>
           <input
             type="email"
             value={profile.email}
@@ -344,7 +347,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
           />
         </label>
         <label className="field">
-          <span>{d.nameLabel}</span>
+          <span>{d("nameLabel")}</span>
           <input
             type="text"
             value={profile.name}
@@ -356,23 +359,23 @@ export default function Dashboard({ dict }: { dict: Dict }) {
           <p className={profile.error ? "warn" : "ok"} role={profile.error ? "alert" : "status"}>{profile.msg}</p>
         )}
         <button type="button" onClick={() => void saveProfile()} disabled={profile.busy}>
-          {profile.busy ? d.profileSaving : d.profileSave}
+          {profile.busy ? d("profileSaving") : d("profileSave")}
         </button>
         <div style={{ marginTop: "0.8rem" }}>
-          <UnlinkButton dict={dict} onUnlinked={() => void refresh()} />
+          <UnlinkButton onUnlinked={() => void refresh()} />
         </div>
       </section>
 
       <div className="stack-sm">
-        <TestConnection dict={dict} />
+        <TestConnection />
         <section className="card">
           <div className="section-head" style={{ marginBottom: "0.6rem" }}>
             <span className="tile sm" aria-hidden>📡</span>
             <div>
-              <h3>{dict.agentStatus.title}</h3>
+              <h3>{ta("title")}</h3>
             </div>
           </div>
-          <AgentStatus dict={dict} />
+          <AgentStatus />
         </section>
       </div>
       </div>
@@ -382,32 +385,32 @@ export default function Dashboard({ dict }: { dict: Dict }) {
           <div className="section-head" style={{ marginBottom: 0 }}>
             <span className="tile sm" aria-hidden>📅</span>
             <div>
-              <h3>{d.slotsTitle}</h3>
+              <h3>{d("slotsTitle")}</h3>
             </div>
           </div>
           <button onClick={() => void toggle()} disabled={edit.busy}>
-            {enabled ? d.toggleOff : d.toggleOn}
+            {enabled ? d("toggleOff") : d("toggleOn")}
           </button>
         </div>
 
-        {!enabled && <p className="muted">{d.disabledNote}</p>}
+        {!enabled && <p className="muted">{d("disabledNote")}</p>}
 
-        <SlotsEditor slots={slots} onChange={setSlots} dict={dict} />
+        <SlotsEditor slots={slots} onChange={setSlots} />
 
         <p className="muted" style={{ margin: "0.9rem 0 0.6rem" }}>
-          {d.gemCost}: {d.gems72}
+          {d("gemCost")}: {d("gems72")}
         </p>
 
         <label className="ack">
           <input type="checkbox" checked={gemAck} onChange={(e) => setGemAck(e.target.checked)} />
-          <span>{d.gemAck.replace("{gems}", ackGems.toLocaleString())}</span>
+          <span>{d("gemAck", { gems: ackGems.toLocaleString() })}</span>
         </label>
 
         {edit.msg && (
           <p className={edit.error ? "warn" : "ok"} role={edit.error ? "alert" : "status"}>{edit.msg}</p>
         )}
         <button type="button" onClick={() => void save()} disabled={edit.busy || slots.length > MAX_SLOTS}>
-          {edit.busy ? d.saving : d.save}
+          {edit.busy ? d("saving") : d("save")}
         </button>
       </section>
 
@@ -416,26 +419,26 @@ export default function Dashboard({ dict }: { dict: Dict }) {
           <div className="section-head" style={{ marginBottom: 0 }}>
             <span className="tile sm" aria-hidden>🚀</span>
             <div>
-              <h3>{d.runTitle}</h3>
+              <h3>{d("runTitle")}</h3>
               {next ? (
               <p className="ok" style={{ margin: "0.3rem 0 0" }}>
-                {d[DAY_KEYS[next.weekday - 1]]} {next.time}
-                {" · "}{d.in} {countdown(nextTs - nowTs)}
+                {d(DAY_KEYS[next.weekday - 1])} {next.time}
+                {" · "}{d("in")} {countdown(nextTs - nowTs)}
               </p>
             ) : (
-              <p className="muted" style={{ margin: "0.3rem 0 0" }}>{enabled ? d.never : d.disabledNote}</p>
+              <p className="muted" style={{ margin: "0.3rem 0 0" }}>{enabled ? d("never") : d("disabledNote")}</p>
             )}
             </div>
           </div>
           <button onClick={() => void runNow()} disabled={run.busy}>
-            {run.busy ? d.running : d.runNow}
+            {run.busy ? d("running") : d("runNow")}
           </button>
         </div>
-        {run.msg === "queued" && <p className="ok" style={{ margin: "0.6rem 0 0" }}>{d.runQueued}</p>}
-        {run.msg === "error" && <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d.runError}</p>}
+        {run.msg === "queued" && <p className="ok" style={{ margin: "0.6rem 0 0" }}>{d("runQueued")}</p>}
+        {run.msg === "error" && <p className="warn" style={{ margin: "0.6rem 0 0" }}>{d("runError")}</p>}
 
         <p className="muted" style={{ margin: "1rem 0 0" }}>
-          {d.lastRun}:{" "}
+          {d("lastRun")}:{" "}
           {me.last_run ? (
             <>
               <span className={statusClass(me.last_run.status)}>{me.last_run.status}</span>
@@ -443,7 +446,7 @@ export default function Dashboard({ dict }: { dict: Dict }) {
               {me.last_run.error && <span className="status-bad"> · {me.last_run.error}</span>}
             </>
           ) : (
-            d.neverRun
+            d("neverRun")
           )}
         </p>
       </section>
