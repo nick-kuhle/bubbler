@@ -33,16 +33,21 @@ jobs, and the heartbeat row would bounce between two hosts.
    Confirm ZXTouch input/screenshots locally and the actual frida-server/ZXTouch bind
    addresses. Frida Python bindings on iOS arm64e are a prerequisite, not assumed to work
    from a generic `pip install`. Avoid printing tokens or codes in logs/shell commands.
-3. **Is the phone responding? Start here.** Run `phone-agent/bootstrap/phone_health.sh`
-   from the laptop — it reports laptop agent/tunnels, phone services (frida-server,
-   ZXTouch, Evony, installed daemon), and points at the cloud heartbeat:
+3. **Is the phone responding? Start here.** Run `phone-agent/bootstrap/admin_test.sh`
+   from the laptop — a one-shot self-test of the whole stack (cloud heartbeat, laptop
+   agent, tunnels, phone/frida/ZXTouch/Evony) that auto-repairs what it can (`--no-repair`
+   to inspect only). `phone_health.sh` is the read-only subset:
    ```sh
-   phone-agent/bootstrap/phone_health.sh
+   phone-agent/bootstrap/admin_test.sh        # full check + auto-repair
+   phone-agent/bootstrap/phone_health.sh      # read-only report
    ```
    Then open the War Room (`/master`) or the Test connection card: the "phone agent" chip
    shows `online`/`offline` from the real heartbeat. "Offline" means no authenticated poll
    for 2+ minutes. Remember a manual `curl /api/agent/events` returns `{event:null}` when
    there is simply no job — that proves nothing about phone liveness.
+   DHCP note: the phone's IP can change (currently `192.168.1.166`). Keep `PHONE_IP` in
+   `start_tunnels.sh`, `phone_health.sh` and `phone-agent/config.yaml` in sync; the scripts
+   accept a `PHONE_IP=…` override.
 4. Laptop mode: open the tunnels and preflight phone services first, then start the agent:
    ```sh
    phone-agent/bootstrap/start_tunnels.sh   # checks frida-server + ZXTouch, opens 27042/6000
@@ -141,7 +146,7 @@ pass. The current code is not proven to protect against duplicate claims or a lo
 
 | Symptom | Check / action |
 |---|---|
-| Dashboard says **phone agent offline** | Run `phone_health.sh`; restart laptop tunnels + agent, or on the phone re-open Dopamine after a reboot, start `frida-server` and the ZXTouch app, then `launchctl load` the daemon. No job runs until the card is green. |
+| Dashboard says **phone agent offline** | Run `admin_test.sh` (auto-repair) or `phone_health.sh`; restart laptop tunnels + agent, or on the phone re-open Dopamine after a reboot, start `frida-server` and the ZXTouch app, then `launchctl load` the daemon. No job runs until the card is green. |
 | ZXTouch not running | It is a phone app, not a daemon — launch it from the home screen (SSH `ps aux \| grep -i zxtouch` to confirm). The agent/tunnels cannot tap or screenshot without it. |
 | Test connection spins forever, no offline chip | The chip + polling come from `/api/agent/status`; check the poll response and the heartbeat row (`agent_health`) directly. |
 | No jobs run after reboot | Dopamine is semi-untethered: manually re-jailbreak; check `frida-server`, ZXTouch, LaunchDaemon and the heartbeat. |

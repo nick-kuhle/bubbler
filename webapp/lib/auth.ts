@@ -17,6 +17,16 @@ function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
+/** True when the email is on the AUTH_SEED invite list. Unset AUTH_SEED = open (used
+ * only until a real deployment pins the member list). Shared by the code-request gate. */
+export function isValidEmailInvitee(email: string): boolean {
+  const e = String(email || "").trim().toLowerCase();
+  if (!e) return false;
+  const seedRaw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.["AUTH_SEED"];
+  if (!seedRaw) return true;
+  return seedRaw.split(",").map((s) => s.trim().toLowerCase()).includes(e);
+}
+
 /** Raw session token handed to the browser (opaque, 48 chars base64url). */
 export function newToken(): string {
   return randomBytes(36).toString("base64url");
@@ -97,8 +107,13 @@ export async function createSession(
   return token;
 }
 
-/** Create a user if needed (private circle, email seed-gated) and start a session. */
-export async function ensureUser(email: string, isOperator = false): Promise<CurrentUser> {
+/** Create a user if needed (private circle, email seed-gated) and start a session.
+ * Returns `created: true` when the user row is brand new — the login layer uses that
+ * to route fresh accounts to the Link-Account wizard instead of the dashboard. */
+export async function ensureUser(
+  email: string,
+  isOperator = false,
+): Promise<{ user: CurrentUser; created: boolean }> {
   const e = String(email || "").trim().toLowerCase();
   if (!e || !e.includes("@")) throw new Error("bad-email");
 
@@ -136,7 +151,7 @@ export async function ensureUser(email: string, isOperator = false): Promise<Cur
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
-  return user;
+  return { user, created };
 }
 
 /** Route guards. */

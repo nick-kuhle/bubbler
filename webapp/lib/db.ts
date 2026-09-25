@@ -194,6 +194,19 @@ const MIGRATIONS: string[] = [
      created_at TEXT NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS idx_runs_user ON runs(user_id, created_at)`,
+  // Passwordless email login: short-lived one-time codes (hashed). One row per code;
+  // unused rows are pruned opportunistically on request. Codes never touch the browser
+  // in production — only the verification route reads them.
+  `CREATE TABLE IF NOT EXISTS email_codes (
+     id TEXT PRIMARY KEY,
+     email TEXT NOT NULL,
+     code_hash TEXT NOT NULL,
+     attempts INTEGER NOT NULL DEFAULT 0,
+     consumed INTEGER NOT NULL DEFAULT 0,
+     created_at TEXT NOT NULL,
+     expires_at TEXT NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes(email, created_at)`,
 ];
 
 /** Column-adds for tables that predate a new column (migrations are idempotent).

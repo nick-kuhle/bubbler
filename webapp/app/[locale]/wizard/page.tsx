@@ -14,14 +14,14 @@ export default async function WizardPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ again?: string }>;
+  searchParams: Promise<{ again?: string; welcome?: string }>;
 }) {
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
   const w = await getTranslations("wizard");
 
-  const again = (await searchParams).again === "1";
+  const { again, welcome } = await searchParams;
   const user = await currentUser();
 
   if (!user) {
@@ -61,10 +61,17 @@ export default async function WizardPage({
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
         <span className="tile" aria-hidden>🛡️</span>
         <div>
-          <p className="kicker">Truce Agreement</p>
+          <p className="kicker">
+            {welcome === "1" ? w("welcomeKicker") : w("kicker")}
+          </p>
           <h2 className="title-pop font-display" style={{ margin: "0.15rem 0 0" }}>{w("title")}</h2>
         </div>
       </div>
+      {welcome === "1" && (
+        <p className="muted" style={{ maxWidth: 560, margin: "0 0 1.2rem" }}>
+          {w("welcomeBody")}
+        </p>
+      )}
       <WizardForm />
     </>
   );

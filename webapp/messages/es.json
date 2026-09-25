@@ -7,7 +7,8 @@
     "dashboard": "panel",
     "info": "cómo funciona",
     "master": "sala de guerra",
-    "wizard": "vincular una cuenta"
+    "wizard": "vincular una cuenta",
+    "signout": "cerrar sesión"
   },
   "landing": {
     "kicker": "Alianza LOL",
@@ -23,7 +24,37 @@
     "f2t": "2500 gemas por turno",
     "f2b": "El juego gasta las gemas de cada tregua — tú solo apruebas el plan una vez.",
     "f3t": "Hecho para LOL",
-    "f3b": "Un círculo acogedor, cero drama. No hacemos seriedad — hacemos escudos."
+    "f3b": "Un círculo acogedor, cero drama. No hacemos seriedad — hacemos escudos.",
+    "chooseTitle": "Bienvenido, guardián",
+    "chooseBody": "Dos formas de entrar — elige una. En cualquier caso, te enviaremos un código de acceso único por correo.",
+    "register": "crear una cuenta",
+    "registerBody": "¿Nuevo aquí? Tu correo crea tu cuenta — te ayudaremos a enlazar tu nombre de Evony en la siguiente pantalla.",
+    "login": "entrar",
+    "loginBody": "¿Ya eres miembro? Entra con el mismo correo que tenemos registrado. Un código para un correo nuevo también crea la cuenta — te pediremos enlazarla.",
+    "sendRegister": "enviarme mi código",
+    "sendLogin": "enviarme mi código",
+    "sending": "enviando código…",
+    "verify": "entrar",
+    "createAccount": "crear mi cuenta",
+    "verifying": "entrando…",
+    "codeLabel": "código de acceso",
+    "codePh": "código de 6 dígitos",
+    "sentTitle": "Revisa tu bandeja",
+    "sentBody": "Te hemos enviado un código de 6 dígitos a {email}. Caduca en 10 minutos y sirve una sola vez.",
+    "codeSentFor": "Un código nuevo va en camino a {email}.",
+    "resend": "reenviar código",
+    "resendIn": "reenviar en {s}s",
+    "diffEmail": "usar otro correo",
+    "changeMode": "volver",
+    "errNotInvited": "Ese correo aún no está en la lista de invitados — pide al operador que te añada.",
+    "errCooldown": "Calma — espera un momento antes de pedir otro código.",
+    "errRateLimit": "Demasiados códigos para este correo — inténtalo en unos minutos.",
+    "errEmailNotConfigured": "Aún no se ha configurado el correo en el servidor — el operador debe conectar un proveedor de correo primero.",
+    "errSendFailed": "No pudimos enviar el correo ahora mismo — inténtalo en un minuto.",
+    "errBadCode": "Ese código no coincide. Revísalo e inténtalo de nuevo.",
+    "errNoCode": "No hay un código activo para ese correo — pide uno nuevo.",
+    "errTooMany": "Demasiados códigos incorrectos — pide uno nuevo para intentarlo.",
+    "errGeneric": "Algo salió mal — inténtalo de nuevo."
   },
   "defaultSlots": {
     "mon": "lunes por la mañana · 09:00",
@@ -125,7 +156,14 @@
     "linkAgain": "vincular otra cuenta",
     "step": "paso",
     "of": "de",
-    "stepsShort": ["Cuenta", "Juego", "Código", "Enlace", "Plan", "Listo"],
+    "stepsShort": [
+      "Cuenta",
+      "Juego",
+      "Código",
+      "Enlace",
+      "Plan",
+      "Listo"
+    ],
     "step1Title": "Tu cuenta de Evony",
     "step1Body": "Introduce la cuenta que LOL debe proteger — tu correo de acceso ya está guardado.",
     "accountLabel": "ID de cuenta de Evony",
@@ -155,7 +193,9 @@
     "failedBody": "Algo salió mal al vincular. Inténtalo de nuevo.",
     "expiredTitle": "Enlace caducado",
     "expiredBody": "Este enlace se quedó sin tiempo.",
-    "retry": "empezar de nuevo"
+    "retry": "empezar de nuevo",
+    "welcomeKicker": "¡Bienvenido a bordo!",
+    "welcomeBody": "¡Ya estás dentro! Enlaza tu cuenta de Evony abajo para que el escudo aterrice en la ciudad correcta. Tarda como un minuto."
   },
   "test": {
     "title": "Probar conexión",

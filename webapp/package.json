@@ -18,12 +18,14 @@
     "@vercel/blob": "^0.27.0",
     "next": "^15.1.0",
     "next-intl": "^4.14.6",
+    "nodemailer": "^10.0.10",
     "pg": "^8.13.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.11.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
