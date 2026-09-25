@@ -23,7 +23,7 @@ type Overview = {
   agent: Agent;
 };
 type Account = {
-  id: string; email: string; evony_name: string; is_operator: number;
+  id: string; email: string; evony_name: string; is_operator: number; linked: number;
   slot_count: number; active_slots: number; last_link_state: string | null; last_run_status: string | null;
   created_at: string;
 };
@@ -200,6 +200,12 @@ function AdminView({
     }), `bubble queued for ${a.evony_name}`);
   const relink = (a: Account) =>
     act(`relink:${a.id}`, () => fetch(`/api/admin/users/${encodeURIComponent(a.id)}/relink`, { method: "POST" }), `relink queued for ${a.evony_name}`);
+  const setLinked = (a: Account) =>
+    act(`linktoggle:${a.id}`, () => fetch(`/api/admin/users/${encodeURIComponent(a.id)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ linked: Number(a.linked) === 1 ? 0 : 1 }),
+    }), `${a.evony_name} marked ${Number(a.linked) === 1 ? "needs link" : "linked"}`);
   const cutSessions = (a: Account) => {
     if (!window.confirm(`Cut every session for ${a.evony_name}? Their phone link will stop until they log in again.`)) return;
     void act(`cut:${a.id}`, () => fetch(`/api/admin/sessions?user_id=${encodeURIComponent(a.id)}`, { method: "DELETE" }), `sessions cut for ${a.evony_name}`);
@@ -288,7 +294,7 @@ function AdminView({
           </div>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>player</th><th>email</th><th>slots</th><th>last link</th><th>last run</th><th>controls</th></tr></thead>
+              <thead><tr><th>player</th><th>email</th><th>slots</th><th>link</th><th>last run</th><th>controls</th></tr></thead>
               <tbody>
                 {data.accounts.map((a) => (
                   <tr key={a.id}>
@@ -298,10 +304,20 @@ function AdminView({
                     </td>
                     <td>{a.email}</td>
                     <td><span className={`badge ${a.active_slots ? "ok" : ""}`}>{a.active_slots}/{a.slot_count}</span></td>
-                    <td>{a.last_link_state ? <span className={`badge ${tone(a.last_link_state)}`}>{a.last_link_state}</span> : <span className="muted">never</span>}</td>
+                    <td>
+                      <span className={`badge ${Number(a.linked) ? "ok" : "warn"}`}>
+                        {Number(a.linked) ? "linked ✓" : "needs link"}
+                      </span>
+                      {a.last_link_state ? (
+                        <span className="muted" style={{ display: "block", fontSize: 12 }}>last: {a.last_link_state}</span>
+                      ) : null}
+                    </td>
                     <td>{a.last_run_status ? <span className={`badge ${tone(a.last_run_status)}`}>{a.last_run_status}</span> : <span className="muted">none</span>}</td>
                     <td>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button type="button" disabled={busyAction === `linktoggle:${a.id}`} onClick={() => void setLinked(a)}>
+                          {busyAction === `linktoggle:${a.id}` ? "…" : Number(a.linked) ? "✓ linked" : "✗ needs link"}
+                        </button>
                         <button type="button" disabled={busyAction === `bubble:${a.id}`} onClick={() => void bubble(a)}>
                           {busyAction === `bubble:${a.id}` ? "…" : "🛡 bubble"}
                         </button>

@@ -135,7 +135,9 @@
     "save": "guardar horario",
     "saving": "guardando…",
     "saved": "Guardado.",
-    "saveError": "No se pudo guardar el horario."
+    "saveError": "No se pudo guardar el horario.",
+    "needsLinkTitle": "Tu cuenta de Evony no está vinculada",
+    "needsLinkBody": "No podemos activar burbujas hasta que tu cuenta de Evony esté conectada y confirmada en el teléfono. Vincúlala desde aquí y quedará en piloto automático."
   },
   "master": {
     "title": "Operador — lista de ejecuciones",

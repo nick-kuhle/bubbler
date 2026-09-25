@@ -135,7 +135,9 @@
     "save": "일정 저장",
     "saving": "저장 중…",
     "saved": "저장됐어요.",
-    "saveError": "일정을 저장하지 못했어요."
+    "saveError": "일정을 저장하지 못했어요.",
+    "needsLinkTitle": "Evony 계정이 연결되지 않았습니다",
+    "needsLinkBody": "Evony 계정이 휴대폰에 로그인되어 확인되기 전에는 버블을 칠 수 없습니다. 여기서 연결하면 자동으로 진행됩니다."
   },
   "master": {
     "title": "운영자 — 마스터 실행 목록",

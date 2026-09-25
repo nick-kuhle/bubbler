@@ -135,7 +135,9 @@
     "save": "保存日程",
     "saving": "保存中…",
     "saved": "已保存。",
-    "saveError": "保存日程失败。"
+    "saveError": "保存日程失败。",
+    "needsLinkTitle": "您的 Evony 账号尚未关联",
+    "needsLinkBody": "在您的 Evony 账号在手机上登录并确认之前，我们无法开启护盾。在此处关联后即可自动运行。"
   },
   "master": {
     "title": "管理员 —— 执行总列表",

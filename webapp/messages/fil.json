@@ -135,7 +135,9 @@
     "save": "i-save ang iskedyul",
     "saving": "sine-save…",
     "saved": "Naka-save.",
-    "saveError": "Hindi ma-save ang iskedyul."
+    "saveError": "Hindi ma-save ang iskedyul.",
+    "needsLinkTitle": "Hindi pa naka-link ang iyong Evony account",
+    "needsLinkBody": "Hindi kami makakapaglagay ng bubble hanggang sa naka-sign in at kinumpirma ang iyong Evony account sa telepono. I-link ito dito at automatic na ito."
   },
   "master": {
     "title": "Operator — master list ng mga run",

@@ -135,7 +135,9 @@
     "save": "simpan jadwal",
     "saving": "menyimpan…",
     "saved": "Tersimpan.",
-    "saveError": "Tidak bisa menyimpan jadwal."
+    "saveError": "Tidak bisa menyimpan jadwal.",
+    "needsLinkTitle": "Akun Evony Anda belum ditautkan",
+    "needsLinkBody": "Kami belum bisa memasang bubble sampai akun Evony Anda masuk dan terkonfirmasi di ponsel. Tautkan dari sini dan semuanya otomatis."
   },
   "master": {
     "title": "Operator — daftar jalan utama",

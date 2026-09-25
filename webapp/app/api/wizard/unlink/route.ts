@@ -13,5 +13,6 @@ export async function POST() {
   await d.run(`DELETE FROM jobs WHERE user_id = ? AND status = 'pending'`, [user.id]);
   await d.run(`DELETE FROM link_sessions WHERE user_id = ?`, [user.id]);
   await d.run(`DELETE FROM slots WHERE user_id = ?`, [user.id]);
+  await d.run(`UPDATE users SET linked = 0 WHERE id = ?`, [user.id]);
   return NextResponse.json({ ok: true });
 }

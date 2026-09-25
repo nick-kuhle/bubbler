@@ -135,7 +135,9 @@
     "save": "lagre timeplan",
     "saving": "lagrer…",
     "saved": "Lagret.",
-    "saveError": "Kunne ikke lagre timeplanen."
+    "saveError": "Kunne ikke lagre timeplanen.",
+    "needsLinkTitle": "Evony-kontoen din er ikke linket",
+    "needsLinkBody": "Vi kan ikke legge ut bobler før Evony-kontoen din er logget inn på telefonen og bekreftet. Link den herfra, så kjører det automatisk."
   },
   "master": {
     "title": "Operatør — hovedliste over kjøringer",

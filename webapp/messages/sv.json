@@ -135,7 +135,9 @@
     "save": "spara schema",
     "saving": "sparar…",
     "saved": "Sparat.",
-    "saveError": "Kunde inte spara schemat."
+    "saveError": "Kunde inte spara schemat.",
+    "needsLinkTitle": "Ditt Evony-konto är inte länkat",
+    "needsLinkBody": "Vi kan inte lägga ut sköldar förrän ditt Evony-konto är inloggat och bekräftat på telefonen. Länka det härifrån så körs allt automatiskt."
   },
   "master": {
     "title": "Operatör — huvudlista för körningar",

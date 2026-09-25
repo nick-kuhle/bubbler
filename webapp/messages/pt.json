@@ -135,7 +135,9 @@
     "save": "salvar agenda",
     "saving": "salvando…",
     "saved": "Salvo.",
-    "saveError": "Não foi possível salvar a agenda."
+    "saveError": "Não foi possível salvar a agenda.",
+    "needsLinkTitle": "Sua conta Evony não está vinculada",
+    "needsLinkBody": "Não podemos ativar bolhas até sua conta Evony estar conectada e confirmada no telefone. Vincule por aqui e tudo fica automático."
   },
   "master": {
     "title": "Operador — lista mestra de execuções",

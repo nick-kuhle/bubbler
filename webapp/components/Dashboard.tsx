@@ -17,7 +17,7 @@ import SlotsEditor, {
 
 type MeResponse = {
   ok: boolean;
-  user: { id: string; email: string; evony_name: string; is_operator: boolean };
+  user: { id: string; email: string; evony_name: string; is_operator: boolean; linked: boolean };
   slots: Array<{ id: string; weekday: number; time: string; shield_hours: number; gem_ack: number }>;
   next_run: { weekday: number; time: string } | null;
   last_run: {
@@ -279,6 +279,17 @@ export default function Dashboard() {
 
   return (
     <section className="stack" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      {!me.user.linked && !me.user.is_operator && (
+        <section className="card warn">
+          <div className="hsplit">
+            <div>
+              <h3 style={{ marginBottom: "0.25rem" }}>{d("needsLinkTitle")}</h3>
+              <p className="muted" style={{ margin: 0 }}>{d("needsLinkBody")}</p>
+            </div>
+            <Link className="btn" href="/wizard?again=1">{d("goWizard")}</Link>
+          </div>
+        </section>
+      )}
       <section className="keep-hero">
         <img src="/images/sky-hero.jpg" alt="" className="cover" />
         <div className="veil" />

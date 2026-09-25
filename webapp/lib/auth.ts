@@ -37,6 +37,7 @@ export type CurrentUser = {
   email: string;
   evony_name: string;
   is_operator: boolean;
+  linked: boolean;
 };
 
 function rowToUser(r: Record<string, unknown>): CurrentUser {
@@ -45,6 +46,7 @@ function rowToUser(r: Record<string, unknown>): CurrentUser {
     email: String(r.email),
     evony_name: String(r.evony_name),
     is_operator: Number(r.is_operator) === 1,
+    linked: Number(r.linked) === 1,
   };
 }
 
@@ -70,11 +72,11 @@ export async function verifyBearer(
   if (!token) return null;
   const agentToken = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.["AGENT_BEARER_TOKEN"];
   if (agentToken && token === agentToken) {
-    return { id: "agent", email: "agent@bubbler", evony_name: "agent", is_operator: true };
+    return { id: "agent", email: "agent@bubbler", evony_name: "agent", is_operator: true, linked: true };
   }
   const d = db();
   const row = await d.get(
-    `SELECT u.id, u.email, u.evony_name, u.is_operator
+    `SELECT u.id, u.email, u.evony_name, u.is_operator, u.linked
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
     [sha256(token), nowIso()],
@@ -86,7 +88,7 @@ export async function currentUser(): Promise<CurrentUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const row = await db().get(
-    `SELECT u.id, u.email, u.evony_name, u.is_operator
+    `SELECT u.id, u.email, u.evony_name, u.is_operator, u.linked
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
     [sha256(token), nowIso()],

@@ -12,7 +12,7 @@ export async function buildOverview() {
     return Number(r?.n ?? 0);
   };
   const accounts = await d.all(
-    `SELECT u.id, u.email, u.evony_name, u.is_operator, u.created_at,
+    `SELECT u.id, u.email, u.evony_name, u.is_operator, u.linked, u.created_at,
             (SELECT COUNT(*) FROM slots s WHERE s.user_id = u.id) AS slot_count,
             (SELECT COUNT(*) FROM slots s WHERE s.user_id = u.id AND s.active = 1) AS active_slots,
             (SELECT state FROM link_sessions ls WHERE ls.user_id = u.id ORDER BY ls.created_at DESC LIMIT 1) AS last_link_state,

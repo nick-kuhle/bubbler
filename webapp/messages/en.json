@@ -135,7 +135,9 @@
     "save": "save schedule",
     "saving": "saving…",
     "saved": "Saved.",
-    "saveError": "Couldn't save the schedule."
+    "saveError": "Couldn't save the schedule.",
+    "needsLinkTitle": "Your Evony account isn't linked",
+    "needsLinkBody": "We can't pop bubbles until your Evony account is signed in and confirmed on the phone. Link it from here and it's on autopilot."
   },
   "master": {
     "title": "Operator — master run list",

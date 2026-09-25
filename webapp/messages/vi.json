@@ -135,7 +135,9 @@
     "save": "lưu lịch",
     "saving": "đang lưu…",
     "saved": "Đã lưu.",
-    "saveError": "Không lưu được lịch."
+    "saveError": "Không lưu được lịch.",
+    "needsLinkTitle": "Tài khoản Evony của bạn chưa được liên kết",
+    "needsLinkBody": "Chúng tôi không thể mở khiên cho đến khi tài khoản Evony của bạn được đăng nhập và xác nhận trên điện thoại. Hãy liên kết ngay tại đây để mọi thứ tự động."
   },
   "master": {
     "title": "Điều hành viên — danh sách chạy tổng",

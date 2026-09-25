@@ -135,7 +135,9 @@
     "save": "salva programma",
     "saving": "salvataggio…",
     "saved": "Salvato.",
-    "saveError": "Impossibile salvare il programma."
+    "saveError": "Impossibile salvare il programma.",
+    "needsLinkTitle": "Il tuo account Evony non è collegato",
+    "needsLinkBody": "Non possiamo attivare le bolle finché il tuo account Evony non è connesso e confermato sul telefono. Collegalo da qui e tutto si automatizza."
   },
   "master": {
     "title": "Operatore — lista principale dei lanci",

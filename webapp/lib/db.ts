@@ -113,6 +113,7 @@ const MIGRATIONS: string[] = [
      email TEXT NOT NULL UNIQUE,
      evony_name TEXT NOT NULL,
      is_operator INTEGER NOT NULL DEFAULT 0,
+     linked INTEGER NOT NULL DEFAULT 0,
      created_at TEXT NOT NULL
    )`,
   `CREATE TABLE IF NOT EXISTS sessions (
@@ -213,6 +214,10 @@ const MIGRATIONS: string[] = [
  * Postgres and modern SQLite both accept plain ADD COLUMN; a duplicate is swallowed so
  * re-running the build on an already-migrated DB is a no-op. */
 const COLUMN_ADDITIONS: Array<{ sql: string; col: string }> = [
+  {
+    col: "users.linked",
+    sql: `ALTER TABLE users ADD COLUMN linked INTEGER NOT NULL DEFAULT 0`,
+  },
   {
     col: "test_sessions.confirmed_name",
     sql: `ALTER TABLE test_sessions ADD COLUMN confirmed_name TEXT`,

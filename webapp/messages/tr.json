@@ -135,7 +135,9 @@
     "save": "programı kaydet",
     "saving": "kaydediliyor…",
     "saved": "Kaydedildi.",
-    "saveError": "Program kaydedilemedi."
+    "saveError": "Program kaydedilemedi.",
+    "needsLinkTitle": "Evony hesabınız bağlı değil",
+    "needsLinkBody": "Evony hesabınız telefonda oturum açıp doğrulanana kadar baloncuk kuramayız. Buradan bağlayın ve her şey otomatik olsun."
   },
   "master": {
     "title": "Operatör — ana çalıştırma listesi",

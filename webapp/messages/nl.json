@@ -135,7 +135,9 @@
     "save": "schema opslaan",
     "saving": "opslaan…",
     "saved": "Opgeslagen.",
-    "saveError": "Het schema kon niet opgeslagen worden."
+    "saveError": "Het schema kon niet opgeslagen worden.",
+    "needsLinkTitle": "Je Evony-account is niet gekoppeld",
+    "needsLinkBody": "We kunnen geen bellen plaatsen totdat je Evony-account op de telefoon is ingelogd en bevestigd. Koppel hem vanaf hier en alles gaat automatisch."
   },
   "master": {
     "title": "Operator — hoofdlijst van runs",

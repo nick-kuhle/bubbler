@@ -41,3 +41,4 @@ node_modules/
 webapp/.env.local
 .vercel
 *.tsbuildinfo
+.env*

@@ -44,6 +44,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tes
     ],
   );
 
+  // A verified test means the phone reached the member's own Evony account and the
+  // device held a working session — that IS the linked state, so mark it.
+  if (status === "ok" && body.verified === true) {
+    await db().run(
+      `UPDATE users SET linked = 1
+        WHERE id = (SELECT user_id FROM test_sessions WHERE id = ?)`,
+      [test_id],
+    );
+  }
+
   // A terminal outcome ends the job: never reclaim a failed/ok one-shot test (a redelivered
   // failed test is what looped the phone into open/close Evony on 2026-09-24).
   if (TERMINAL.has(status)) await markJobDoneBySession("test", test_id);

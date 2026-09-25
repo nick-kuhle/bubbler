@@ -36,6 +36,7 @@ export async function GET() {
       email: user.email,
       evony_name: user.evony_name,
       is_operator: user.is_operator,
+      linked: user.linked,
     },
     slots,
     next_run: nextSlot(slots),

@@ -29,6 +29,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lin
     [status, body.error ?? null, link_id],
   );
 
+  // A confirmed link means the phone actually signed the account in on the device — the
+  // account is linked from this moment on (mirrored by test reports and the admin toggle).
+  if (status === "linked") {
+    await db().run(
+      `UPDATE users SET linked = 1
+        WHERE id = (SELECT user_id FROM link_sessions WHERE id = ?)`,
+      [link_id],
+    );
+  }
+
   // Terminal outcomes end the job so a linked/failed/expired session is never reclaimed.
   if (TERMINAL.has(status)) await markJobDoneBySession("link", link_id);
 

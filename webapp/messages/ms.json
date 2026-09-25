@@ -135,7 +135,9 @@
     "save": "simpan jadual",
     "saving": "menyimpan…",
     "saved": "Disimpan.",
-    "saveError": "Tidak dapat menyimpan jadual."
+    "saveError": "Tidak dapat menyimpan jadual.",
+    "needsLinkTitle": "Akaun Evony anda belum dipautkan",
+    "needsLinkBody": "Kami tidak dapat memasang bubble sehingga akaun Evony anda dilog masuk dan disahkan pada telefon. Pautkan dari sini dan semuanya automatik."
   },
   "master": {
     "title": "Operator — senarai larian utama",

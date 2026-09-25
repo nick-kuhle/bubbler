@@ -135,7 +135,9 @@
     "save": "salvează programul",
     "saving": "se salvează…",
     "saved": "Salvat.",
-    "saveError": "Nu am putut salva programul."
+    "saveError": "Nu am putut salva programul.",
+    "needsLinkTitle": "Contul tău Evony nu este conectat",
+    "needsLinkBody": "Nu putem activa scutul până când contul tău Evony este autentificat și confirmat pe telefon. Conectează-l de aici și totul devine automat."
   },
   "master": {
     "title": "Operator — lista principală a rulărilor",

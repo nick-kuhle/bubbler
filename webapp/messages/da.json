@@ -135,7 +135,9 @@
     "save": "gem tidsplan",
     "saving": "gemmer…",
     "saved": "Gemt.",
-    "saveError": "Kunne ikke gemme tidsplanen."
+    "saveError": "Kunne ikke gemme tidsplanen.",
+    "needsLinkTitle": "Din Evony-konto er ikke forbundet",
+    "needsLinkBody": "Vi kan ikke lægge skjolde op, før din Evony-konto er logget ind og bekræftet på telefonen. Forbind den herfra, så kører det automatisk."
   },
   "master": {
     "title": "Operatør — oversigt over alle kørsler",

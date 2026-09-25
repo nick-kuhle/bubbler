@@ -135,7 +135,9 @@
     "save": "enregistrer le planning",
     "saving": "enregistrement…",
     "saved": "Enregistré.",
-    "saveError": "Impossible d'enregistrer le planning."
+    "saveError": "Impossible d'enregistrer le planning.",
+    "needsLinkTitle": "Votre compte Evony n'est pas lié",
+    "needsLinkBody": "Nous ne pouvons pas lancer les boucliers tant que votre compte Evony n'est pas connecté et confirmé sur le téléphone. Liez-le ici et tout sera automatique."
   },
   "master": {
     "title": "Opérateur — liste principale des lancements",

@@ -135,7 +135,9 @@
     "save": "zeitplan speichern",
     "saving": "speichern…",
     "saved": "Gespeichert.",
-    "saveError": "Der Zeitplan konnte nicht gespeichert werden."
+    "saveError": "Der Zeitplan konnte nicht gespeichert werden.",
+    "needsLinkTitle": "Dein Evony-Konto ist nicht verknüpft",
+    "needsLinkBody": "Wir können keine Schilde setzen, bis dein Evony-Konto auf dem Telefon angemeldet und bestätigt ist. Verknüpfe es hier und alles läuft automatisch."
   },
   "master": {
     "title": "Operator — Master-Laufliste",
