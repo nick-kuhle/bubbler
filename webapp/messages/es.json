@@ -7,7 +7,8 @@
     "dashboard": "panel",
     "info": "cómo funciona",
     "master": "sala de guerra",
-    "wizard": "vincular una cuenta"
+    "wizard": "vincular una cuenta",
+    "signout": "cerrar sesión"
   },
   "landing": {
     "kicker": "Alianza LOL",

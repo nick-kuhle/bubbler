@@ -7,7 +7,8 @@
     "dashboard": "dashboard",
     "info": "how it works",
     "master": "war room",
-    "wizard": "link an account"
+    "wizard": "link an account",
+    "signout": "sign out"
   },
   "landing": {
     "kicker": "Alliance LOL",

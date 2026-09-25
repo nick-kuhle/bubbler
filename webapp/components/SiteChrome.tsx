@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import SignOutButton from "@/components/SignOutButton";
 import UtcClock from "@/components/UtcClock";
 import { Link, UTC_NOTE, type Dict } from "@/lib/i18n";
 import { usePathname } from "@/src/i18n/navigation";
@@ -46,6 +47,7 @@ export default function SiteChrome({
           <UtcClock />
           <span className="utc-note">{UTC_NOTE}</span>
           <LanguageSwitcher />
+          <SignOutButton label={dict.nav.signout} />
           <button
             type="button"
             className="menu-btn"
@@ -62,6 +64,7 @@ export default function SiteChrome({
             {n.label}
           </Link>
         ))}
+        <SignOutButton label={dict.nav.signout} />
       </div>
       <main>{children}</main>
       <footer className="site-foot">
