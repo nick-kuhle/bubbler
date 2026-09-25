@@ -36,6 +36,9 @@ export async function touchAgentHealth(meta: AgentMeta, sawEvent: boolean): Prom
   const host = meta.host ?? null;
   const pid = meta.pid ?? null;
   // last_event_at only moves forward (an event was claimed on that poll round).
+  // Identity fields (version/hostname/pid) are only *updated* when the poll actually
+  // supplies meta — a bare poll (e.g. the admin self-test) must not blank the agent's
+  // identity away, only refresh liveness.
   if (sawEvent) {
     await d.run(
       `INSERT INTO agent_health (agent_id, last_seen_at, last_event_at, version, hostname, pid, updated_at)
@@ -43,9 +46,9 @@ export async function touchAgentHealth(meta: AgentMeta, sawEvent: boolean): Prom
        ON CONFLICT(agent_id) DO UPDATE SET
          last_seen_at = excluded.last_seen_at,
          last_event_at = excluded.last_event_at,
-         version = excluded.version,
-         hostname = excluded.hostname,
-         pid = excluded.pid,
+         version = COALESCE(excluded.version, agent_health.version),
+         hostname = COALESCE(excluded.hostname, agent_health.hostname),
+         pid = COALESCE(excluded.pid, agent_health.pid),
          updated_at = excluded.updated_at`,
       [AGENT_ID, ts, ts, version, host, pid, ts],
     );
@@ -56,9 +59,9 @@ export async function touchAgentHealth(meta: AgentMeta, sawEvent: boolean): Prom
        ON CONFLICT(agent_id) DO UPDATE SET
          last_seen_at = excluded.last_seen_at,
          last_event_at = agent_health.last_event_at,
-         version = excluded.version,
-         hostname = excluded.hostname,
-         pid = excluded.pid,
+         version = COALESCE(excluded.version, agent_health.version),
+         hostname = COALESCE(excluded.hostname, agent_health.hostname),
+         pid = COALESCE(excluded.pid, agent_health.pid),
          updated_at = excluded.updated_at`,
       [AGENT_ID, ts, version, host, pid, ts],
     );

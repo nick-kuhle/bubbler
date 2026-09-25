@@ -5,11 +5,15 @@
 #   phone-agent/bootstrap/admin_test.sh            # checks AND auto-repairs
 #   phone-agent/bootstrap/admin_test.sh --no-repair
 #
-# Covers, in order: cloud (homepage, agent event poll, heartbeat), laptop agent
+# Covers, in order: cloud (homepage, heartbeat + bearer-token auth), laptop agent
 # service, SSH tunnels (Frida 27042 + ZXTouch 6000), phone reachability and the
 # phone-side services (frida-server, ZXTouch, Evony). Anything it can restart it
 # does automatically (tunnels = start_tunnels.sh, agent = systemd user unit); a
 # wildcard FAIL means a hands-on fix from docs/06-runbook.md.
+#
+# Note: we never call /api/agent/events from the laptop — a bare poll with no
+# v/host/pid would fight the real agent for jobs and blur its heartbeat identity.
+# The /api/agent/status endpoint already proves the bearer token is accepted.
 #
 # Env overrides: PHONE_IP, SSH_KEY, SSH_USER, BASE_URL, AGENT_TOKEN.
 
@@ -50,18 +54,15 @@ echo "== cloud =="
 code="$(curl -sL -o /dev/null -w '%{http_code}' -m 15 "$BASE_URL/" || echo 000)"
 [ "$code" = "200" ] && ok "homepage reachable (HTTP 200 after locale redirect)" || bad "homepage unreachable (final HTTP $code)"
 
-agent_json="$(curl -s -m 12 -H "Authorization: Bearer $AGENT_TOKEN" "$BASE_URL/api/agent/events?hold=1")"
-case "$agent_json" in
-  *'"ok":true'*) ok "agent event poll authenticates against cloud" ;;
-  *'"unauthorized"'*) bad "agent token rejected (compare config.yaml vs Vercel AGENT_BEARER_TOKEN)" ;;
-  *) bad "agent event poll error: ${agent_json:-empty response}" ;;
-esac
-
+# NOTE: no /api/agent/events call here on purpose (see header comment).
 status_json="$(curl -s -m 12 -H "Authorization: Bearer $AGENT_TOKEN" "$BASE_URL/api/agent/status")"
 case "$status_json" in
   *'"online":true'*)
     ok "cloud heartbeat ONLINE"
-    echo "        heartbeat: $(echo "$status_json" | sed -n 's/.*"version":"\([^"]*\)".*"hostname":"\([^"]*\)".*"last_seen_at":"\([^"]*\)".*/version=\1 host=\2 last_seen=\3/p')"
+    v="$(echo "$status_json" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')"
+    h="$(echo "$status_json" | sed -n 's/.*"hostname":"\([^"]*\)".*/\1/p')"
+    t="$(echo "$status_json" | sed -n 's/.*"last_seen_at":"\([^"]*\)".*/\1/p')"
+    echo "        version=$v host=$h last_seen=$t"
     ;;
   *'"online":false'*)
     bad "cloud heartbeat OFFLINE — last poll older than the online window"
