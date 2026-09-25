@@ -381,26 +381,37 @@ class EvonyController:
                 return {"status": "expired", "error": "code entry window expired"}
             try:
                 self._enter_code(code)
-                self._confirm_load_account()
             except CalibrationMissing as extra:
                 return {"status": "failed", "error": f"calibration: {extra}"}
-            time.sleep(28)
-            if self.on_screen("world_view"):
+            state = self._settle_after_code()
+            if state == "world":
                 return {"status": "linked"}
-            if self._code_dialog_visible():
-                attempts += 1
-                if attempts >= 3:
+            if state == "confirm":
+                ok, name = self._accept_load_confirm(None)
+                if not ok:
+                    return {"status": "failed", "error": f"load-account name mismatch ({name})"}
+                after = self._settle_after_code(timeout=20.0)
+                if after == "confirm":
+                    self._confirm_load_account()
+                    after = self._settle_after_code(timeout=12.0)
+                if after == "world" or self.on_screen("world_view"):
+                    return {"status": "linked"}
+                return {"status": "failed", "error": "load-account confirm did not complete"}
+            attempts += 1
+            if state == "unknown":
+                # not clearly world/confirm/code — could be a new-account intro;
+                # give it one more generous settle before writing it off
+                state = self._settle_after_code(timeout=25.0)
+                if state in ("world", "confirm"):
+                    continue
+            if attempts >= 3:
+                if state == "code":
                     return {"status": "failed", "error": "code was not accepted"}
-                report_expired()
-                self.tap_resend()
-                continue
-            if self._dialog_visible():
-                log.info("load-account dialog still up; tapping confirm again")
-                self._confirm_load_account()
-                time.sleep(20)
-                if self._dialog_visible() or self._code_dialog_visible():
-                    return {"status": "failed", "error": "load-account confirm did not complete"}
-            return {"status": "linked"}
+                return {"status": "failed", "error": f"code flow did not settle ({state})"}
+            log.info("verification not accepted (settle=%s); resending (attempt %d/3)",
+                     state, attempts)
+            report_expired()
+            self.tap_resend()
 
     def _login_icon_point(self) -> tuple[int, int]:
         spec = (self.cal.screens.get("email_login") or {}) if self.cal else {}
@@ -514,28 +525,49 @@ class EvonyController:
             return True
         return False
 
-    @staticmethod
-    def _code_dialog_present(img) -> bool:
-        cr, cg, cb = img.getpixel((250, 1100))
-        red_cancel = cr > 70 and cr > cg + 30 and cg < 90
-        if red_cancel:
+    def _keypad_grid_present(self, img) -> bool:
+        """True when the in-app verification dialer is visible: most of the 10
+        dialer keys (from calibration) each carry a dark digit glyph. The dialer
+        is language-invariant and structurally distinct from the world view."""
+        keypad = (self._code_spec().get("keypad") or {}) if self.cal else {}
+        if not keypad:
             return False
-        rows_ok = rows = 0
-        for y in range(720, 1000, 16):
+        ok = total = 0
+        for big in keypad.values():
+            total += 1
+            cx, cy = int(big.get("x", 0)), int(big.get("y", 0))
+            if cx <= 0 or cy <= 0:
+                continue
             hits = n = 0
-            for x in range(160, 670, 10):
-                r, g, b = img.getpixel((x, y))
-                n += 1
-                parchment = (
-                    155 <= r <= 200 and 135 <= g <= 175 and 90 <= b <= 135
-                    and abs(r - g) <= 35 and (g - b) >= 20 and (r - b) >= 35
-                )
-                if parchment:
-                    hits += 1
-            rows += 1
-            if n and hits / n >= 0.5:
-                rows_ok += 1
-        return rows > 0 and (rows_ok / rows) >= 0.35
+            for y in range(max(0, cy - 22), cy + 23, 4):
+                for x in range(max(0, cx - 42), cx + 43, 4):
+                    r, g, b = img.getpixel((x, y))
+                    n += 1
+                    if (r + g + b) / 3 < 135:
+                        hits += 1
+            if n and hits / n >= 0.07:
+                ok += 1
+        return total > 0 and ok >= max(7, int(total * 0.7))
+
+    def _code_dialog_present(self, img) -> bool:
+        """True when the 6-digit verification dialog is on screen.
+
+        Two layout families: the bright in-app dialog with a pre-raised dialer,
+        detected by the measured keypad grid (language-invariant); and the legacy
+        parchment chrome (parchment band + six bright boxes, no red cancel). The
+        world view matches neither.
+        """
+        if img is None or img.size[0] < 800 or img.size[1] < 1600:
+            return False
+        if self._keypad_grid_present(img):
+            # the dialer alone isn't conclusive — a world view can carry dark
+            # marks at those cells; require the six-box row as well
+            return self._code_boxes_visible(img)
+        if self._red_cancel_present(img):
+            return False
+        if not self._code_boxes_visible(img):
+            return False
+        return self._parchment_present(img)
 
     def _is_load_confirm_dialog(self, img) -> bool:
         """True when the dark '…load the Lv30 account <name>?  Cancel | Confirm'
@@ -631,14 +663,45 @@ class EvonyController:
         return cr > 70 and cr > cg + 30 and cg < 90
 
     def _code_boxes_visible(self, img) -> bool:
-        """True when the six code input boxes look present (bright box faces
-        where parchment would otherwise be)."""
-        bright = 0
-        for x in (130, 241, 352, 463, 573, 684):
-            r, g, b = img.getpixel((x, 813))
-            if min(r, g, b) > 165 and b > 150:
-                bright += 1
-        return bright >= 4
+        """True when the six code input boxes look present.
+
+        Two styles: dark recessed boxes (r~77,g~62,b~41) separated by parchment
+        gaps (r~145,g~125,b~90) on the current dialog build, and the legacy
+        bright box faces (min>165). Decided on the box faces plus a strip check
+        of the gaps between boxes so a single wide email field isn't misread as
+        six boxes.
+        .. version changed:: probe both box rows (new & legacy) for safety
+        """
+        if img is None:
+            return False
+        spec = (self.cal.screens.get("code_dialog") or {}) if self.cal else {}
+        raw_boxes = spec.get("boxes")
+        xs = [int(b.get("x", 0)) for b in raw_boxes] if raw_boxes else (
+            130, 241, 352, 463, 573, 684)
+        if len(xs) != 6:
+            return False
+
+        def faces_at(y):
+            dark = bright = 0
+            for x in xs:
+                r, g, b = img.getpixel((x, y))
+                if r < 130 and g < 110 and b < 85:
+                    dark += 1
+                if min(r, g, b) > 165 and b > 150:
+                    bright += 1
+            return dark, bright
+
+        dark_new, bright_new = faces_at(825)
+        dark_old, bright_old = faces_at(813)
+        # dark-face style: ≥5 dark boxes; a continuous field shows no gaps
+        if max(dark_new, dark_old) >= 5:
+            gaps = 0
+            for gx in (185, 296, 407, 518, 629):
+                r, g, b = img.getpixel((gx, 825))
+                if r >= 138 and g >= 118 and b >= 85 and (r - g) >= 12 and (g - b) >= 25:
+                    gaps += 1
+            return gaps >= 4
+        return max(bright_new, bright_old) >= 4
 
     def _email_field_visible(self, img) -> bool:
         """True when ONE wide input box spans the email band — as opposed to
@@ -817,18 +880,91 @@ class EvonyController:
             self.t.tap(x, y)
             time.sleep(0.35)
         time.sleep(0.5)
-        done_x, done_y = self._code_tap("done", (605, 1146))
-        log.info("tap keyboard Done %s,%s", done_x, done_y)
-        self.t.tap(done_x, done_y)
-        time.sleep(0.6)
-        try:
-            self.t.hide_keyboard()
-        except Exception:
-            pass
-        time.sleep(1.2)
-        confirm_x, confirm_y = self._code_tap("confirm", (580, 1082))
-        log.info("tap code confirm %s,%s", confirm_x, confirm_y)
-        self.t.tap(confirm_x, confirm_y)
+        # Once the 6th digit lands, the dialog shows a readback row with blue
+        # 'Done | Cancel' text buttons under the boxes (measured ~605,1146) and
+        # keeps the dialer up — Done must be pressed to submit. The legacy
+        # 'confirm' point (580,1082) is dropped: it is empty dialog surface in
+        # this build and blind-tapping it could mistype a keypad key.
+        img = self._grab()
+        if img is not None and self._code_dialog_present(img):
+            done_x, done_y = self._code_tap("done", (605, 1146))
+            log.info("tap verification Done %s,%s", done_x, done_y)
+            self.t.tap(done_x, done_y)
+            time.sleep(0.8)
+        self._tap_green_confirm(timeout=10.0)
+
+    def _green_confirm_point(self, img) -> tuple[int, int] | None:
+        """Center of the green 'Confirmar' button revealed once Done hides the
+        dialer (measured ~578,1112; rounded rect x477-679 y1077-1147). Where a
+        fresh frame can't produce a compact green blob, returns None."""
+        if img is None or img.size[0] < 800 or img.size[1] < 1600:
+            return None
+        import numpy as _np
+        a = _np.asarray(img.convert("RGB")).astype(int)
+        r, g, b = a[:, :, 0], a[:, :, 1], a[:, :, 2]
+        mask = (g > r + 25) & (g > b + 25) & (g > 100)
+        ys, xs = _np.where(mask)
+        if len(xs) < 600:
+            return None
+        h = int(ys.max() - ys.min())
+        w = int(xs.max() - xs.min())
+        if not (40 <= h <= 320 and 80 <= w <= 460):
+            return None
+        cx, cy = int(round(xs.mean())), int(round(ys.mean()))
+        if not (200 < cx < 740 and 900 < cy < 1450):
+            return None
+        return cx, cy
+
+    def _tap_green_confirm(self, timeout: float = 8.0) -> bool:
+        """After Done, the app reveals a green Confirmar button that advances to
+        the load-account step. Poll for it and tap its center; False when it
+        never shows (e.g. a wrong code with no accept path)."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            img = self._grab()
+            if img is not None and self._is_load_confirm_dialog(img):
+                # the dark load-account overlay has its own Confirm button;
+                # never tap it here — the caller's settle/watch handles it
+                log.info("load-account overlay already up after Done; skipping green step")
+                return False
+            pt = self._green_confirm_point(img)
+            if pt:
+                log.info("tapping green Confirmar %s,%s", *pt)
+                self.t.tap(*pt)
+                return True
+            time.sleep(1.2)
+        log.warning("green Confirmar button not seen within %.1fs", timeout)
+        return False
+
+    def _settle_after_code(self, timeout: float = 22.0) -> str:
+        """After the 6 digits land, watch where the app goes.
+
+        Returns 'world' (linked), 'confirm' (dark load-account overlay is up and
+        wants a Confirm tap), 'code' (verification dialog still on screen: wrong
+        code or awaiting the submit animation), or 'unknown' (nothing matched:
+        transitions, new-account intros, uncalibrated dialogs).
+        """
+        deadline = time.monotonic() + timeout
+        last = "unknown"
+        while time.monotonic() < deadline:
+            raw, img = self._grab_both()
+            if self._template_hit(raw, "world_view"):
+                return "world"
+            if img is not None and self._world_looks_reached(img):
+                time.sleep(2.5)
+                raw, img = self._grab_both()
+                if self._template_hit(raw, "world_view") or (
+                        img is not None and self._world_looks_reached(img)):
+                    return "world"
+                last = "world"
+            if img is not None and self._is_load_confirm_dialog(img):
+                return "confirm"
+            if self._template_hit(raw, "load_confirm"):
+                return "confirm"
+            if img is not None and self._code_dialog_present(img):
+                last = "code"
+            time.sleep(1.6)
+        return last
 
     def _load_confirm_point(self, default: tuple[int, int]) -> tuple[int, int]:
         """Tap point for the Confirm button on the dark load-account dialog."""
@@ -1008,6 +1144,15 @@ class EvonyController:
 
     def tap_resend(self) -> None:
         try:
+            img = self._grab()
+            if img is not None and self._code_dialog_present(img):
+                # The calibrated resend point lives inside the new dialer; skip
+                # it rather than mash a keypad key. The wizard's expire/retry
+                # path still drives a fresh code via report_expired.
+                rx, ry = self._code_tap("resend", (250, 1082))
+                if self._keypad_grid_present(img):
+                    log.info("skipping resend tap %s,%s (in dialer keypad)", rx, ry)
+                    return
             self.tap("code_dialog", "resend")       # fresh code + fresh 90s window
         except CalibrationMissing:
             log.warning("resend tap not calibrated; relying on user retrigger")

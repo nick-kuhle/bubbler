@@ -35,7 +35,7 @@
       "taps": {
         "code": {
           "x": 130,
-          "y": 813
+          "y": 825
         },
         "confirm": {
           "x": 580,
@@ -57,71 +57,72 @@
       "boxes": [
         {
           "x": 130,
-          "y": 813
+          "y": 825
         },
         {
           "x": 241,
-          "y": 813
+          "y": 825
         },
         {
           "x": 352,
-          "y": 813
+          "y": 825
         },
         {
           "x": 463,
-          "y": 813
+          "y": 825
         },
         {
           "x": 573,
-          "y": 813
+          "y": 825
         },
         {
           "x": 684,
-          "y": 813
+          "y": 825
         }
       ],
       "keypad": {
         "1": {
           "x": 142,
-          "y": 1244
+          "y": 1233
         },
         "2": {
-          "x": 414,
-          "y": 1244
+          "x": 413,
+          "y": 1256
         },
         "3": {
-          "x": 686,
-          "y": 1244
+          "x": 690,
+          "y": 1254
         },
         "4": {
-          "x": 142,
-          "y": 1362
+          "x": 141,
+          "y": 1365
         },
         "5": {
-          "x": 414,
-          "y": 1362
+          "x": 413,
+          "y": 1364
         },
         "6": {
-          "x": 686,
-          "y": 1362
+          "x": 690,
+          "y": 1367
         },
         "7": {
-          "x": 142,
-          "y": 1474
+          "x": 140,
+          "y": 1486
         },
         "8": {
-          "x": 414,
-          "y": 1474
+          "x": 413,
+          "y": 1476
         },
         "9": {
-          "x": 686,
-          "y": 1474
+          "x": 689,
+          "y": 1480
         },
         "0": {
-          "x": 414,
-          "y": 1586
+          "x": 412,
+          "y": 1583
         }
-      }
+      },
+      "note": "6-digit verification dialog. keypad = measured digit-glyph centers (phase-A capture). After the 6th digit the dialog shows a readback row ('768208 | Done  Cancel') with the dialer STILL up; the final step is the blue Done text at (605,1146). Legacy 'confirm' (580,1082) is empty dialog surface - do not tap. boxes/load_confirm shared with the load-account step."
     },
     "login_prompt": {
       "template": "login_prompt.png",
