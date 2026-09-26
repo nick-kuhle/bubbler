@@ -237,8 +237,13 @@ def repair(cfg: dict) -> RepairReport:
             except (subprocess.TimeoutExpired, OSError) as exc:
                 report.add("zxtouch", False, f"launch failed: {exc}")
 
-    # 5. re-open the tunnels — the actual repair
+    # 5. re-open the tunnels — the actual repair.
+    #    reset-failed FIRST: when the phone reboots, ssh exits, the unit burns through
+    #    StartLimitBurst and lands in failed/start-limit-hit. systemd then *refuses* a
+    #    plain restart ("start of the service was attempted too often") and never even
+    #    tries, so without this the repair cannot recover the exact outage it exists for.
     try:
+        _systemctl("reset-failed", TUNNEL_UNIT)
         restarted = _systemctl("restart", TUNNEL_UNIT)
     except (subprocess.TimeoutExpired, OSError) as exc:
         report.add("tunnel_restart", False, f"systemctl failed: {exc}")
