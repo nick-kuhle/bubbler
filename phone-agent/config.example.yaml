@@ -19,6 +19,14 @@ phone:
   ssh_host: ""                # e.g. 192.168.x.x when the brain runs on this laptop
   ssh_user: mobile
   ssh_key: ~/.ssh/bubbler_phone_ed25519
+  # Root key for the ONE job that needs uid 0: starting frida-server, which ptraces
+  # the game. The jailbreak's sudo asks for a password, so key-based root SSH is the
+  # only unattended option. Authorize the same public key in the phone's root
+  # authorized_keys (on Dopamine: /var/jb/var/root/.ssh/authorized_keys — that is the
+  # home `getent passwd root` reports, not /var/root). Leave empty to disable: the
+  # repair then reports frida as needing a manual start instead of silently failing.
+  root_ssh_user: root
+  root_ssh_key: ~/.ssh/bubbler_phone_ed25519
 
 vision:
   enabled: false                  # set true after calibration assets are captured

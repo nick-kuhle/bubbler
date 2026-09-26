@@ -83,17 +83,38 @@ def _ssh_target(phone: dict) -> str:
     return f"{phone.get('ssh_user') or 'mobile'}@{phone.get('ssh_host') or ''}"
 
 
-def _ssh(phone: dict, command: str, timeout: int = 20) -> subprocess.CompletedProcess:
+def _ssh(phone: dict, command: str, timeout: int = 20, user: str | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
         [
             "ssh", "-i", str(_ssh_key(phone)),
             "-o", "BatchMode=yes",
             "-o", "IdentitiesOnly=yes",
             "-o", "ConnectTimeout=8",
-            _ssh_target(phone), command,
+            f"{user or phone.get('ssh_user') or 'mobile'}@{phone.get('ssh_host') or ''}",
+            command,
         ],
         capture_output=True, text=True, timeout=timeout,
     )
+
+
+def _root_ssh(phone: dict, command: str, timeout: int = 20) -> subprocess.CompletedProcess | None:
+    """Run a command as root on the phone, if a root key is configured.
+
+    frida-server must run as root (it ptraces the game), and the jailbreak's `sudo` asks
+    for a password, so the only unattended option is key-based root SSH. Returns None when
+    no root key is configured or root login is not set up, so the caller can degrade to a
+    clear "start this by hand" message instead of a confusing auth error.
+    """
+    root_key = str(phone.get("root_ssh_key") or "").strip()
+    if not root_key:
+        return None
+    key = Path(os.path.expanduser(root_key))
+    if not key.exists():
+        return None
+    try:
+        return _ssh(phone, command, timeout=timeout, user=str(phone.get("root_ssh_user") or "root"))
+    except (subprocess.TimeoutExpired, OSError):
+        return None
 
 
 def _port_open(port: int, host: str = "127.0.0.1") -> bool:
@@ -141,28 +162,58 @@ def repair(cfg: dict) -> RepairReport:
         return report
     report.add("phone_reachable", True, _ssh_target(phone))
 
-    # 3. frida-server is a phone-side service; relaunch it if the reboot took it down
+    # 3. frida-server is a phone-side service; relaunch it if the reboot took it down.
+    #    NOTE: the jailbreak already runs a launchd KeepAlive job (re.frida.server) as root
+    #    with RunAtLoad, so a killed frida comes back on its own within ~5s. Give launchd
+    #    that window first — force-starting underneath it races for port 27042 and can
+    #    leave the daemon flapping between two owners. Only if launchd has not restored it
+    #    do we start it ourselves, which needs root (see _root_ssh).
+    def _frida_procs() -> int:
+        probe = _ssh(phone, 'ps aux | grep -c "[f]rida-server" || true', timeout=15)
+        head = probe.stdout.strip().splitlines()[-1:] or ["0"]
+        return int(head[0].strip() or 0)
+
     try:
-        frida = _ssh(phone, 'ps aux | grep -c "[f]rida-server" || true', timeout=15)
+        count = _frida_procs()
     except (subprocess.TimeoutExpired, OSError) as exc:
-        frida = None
         report.add("frida_server", False, f"check failed: {exc}")
     else:
-        running = frida.stdout.strip().splitlines()[-1:] or ["0"]
-        if running[0].strip() not in ("", "0"):
+        if count:
             report.add("frida_server", True, "running")
         else:
-            _log("frida-server is not running; starting it on the phone")
-            try:
-                _ssh(phone, "/var/jb/usr/sbin/frida-server >/dev/null 2>&1 &", timeout=15)
+            # give launchd's KeepAlive a chance before intervening
+            for _ in range(3):
                 time.sleep(3)
-            except (subprocess.TimeoutExpired, OSError) as exc:
-                report.add("frida_server", False, f"start failed: {exc}")
+                try:
+                    count = _frida_procs()
+                except (subprocess.TimeoutExpired, OSError):
+                    break
+                if count:
+                    break
+            if count:
+                report.add("frida_server", True, "recovered by launchd KeepAlive")
             else:
-                after = _ssh(phone, 'ps aux | grep -c "[f]rida-server" || true', timeout=15)
-                count = (after.stdout.strip().splitlines() or ["0"])[-1].strip()
-                report.add("frida_server", count not in ("", "0"),
-                           "started" if count not in ("", "0") else "still not running after start")
+                _log("frida-server is still down after waiting for launchd; starting it as root")
+                # frida-server only works as root (it ptraces the game) and the jailbreak's
+                # sudo asks for a password, so key-based root SSH is the only unattended
+                # route. `mobile` cannot start it: the binary is root-owned and it needs
+                # uid 0 to attach to the game.
+                started = _root_ssh(phone, "/var/jb/usr/sbin/frida-server >/dev/null 2>&1 &", timeout=15)
+                if started is None:
+                    report.add("frida_server", False,
+                               "not running and cannot self-start: frida-server needs root. "
+                               "Authorize the laptop key for root SSH (phone.root_ssh_key) or "
+                               "start it on the phone: sudo /var/jb/usr/sbin/frida-server")
+                elif started.returncode != 0:
+                    report.add("frida_server", False,
+                               (started.stderr or "root ssh refused").strip()[:200])
+                else:
+                    time.sleep(3)
+                    after = _root_ssh(phone, 'ps aux | grep -c "[f]rida-server" || true', timeout=15)
+                    n = int(((after.stdout.strip().splitlines() or ["0"])[-1].strip() or "0")) if after else 0
+                    report.add("frida_server", n > 0,
+                               "started" if n else "still not running after start (check the phone)")
+
 
     # 4. ZXTouch is an app, not a daemon — it must be foregrounded. This is the other
     #    half of the outage: the reboot left the tunnels up-able but nothing to talk to.
