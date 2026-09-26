@@ -52,6 +52,12 @@ export async function buildOverview() {
   );
   const agent = await agentHealth();
   const { agent_id: _agentId, ...agentStatus } = agent ?? { online: false, last_seen_at: null, last_event_at: null, version: null, hostname: null, pid: null, offline_for_ms: 0 };
+  // Last stack repair ("restart agent" button): its steps are folded into runs.error.
+  const maintenance = (await d.all(
+    `SELECT r.id, r.status, r.error, r.duration_ms, r.created_at
+       FROM runs r WHERE r.trigger = 'maintenance'
+      ORDER BY r.created_at DESC LIMIT 1`,
+  )) as { id: string; status: string; error: string | null; duration_ms: number | null; created_at: string }[];
   const counts = {
     users: await field("SELECT COUNT(*) AS n FROM users"),
     sessions: await field("SELECT COUNT(*) AS n FROM sessions"),
@@ -61,5 +67,22 @@ export async function buildOverview() {
     jobs_pending: await field("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('pending','claimed')"),
     runs: await field("SELECT COUNT(*) AS n FROM runs"),
   };
-  return { counts, accounts, slots, sessions, link_sessions: linkSessions, test_sessions: testSessions, jobs, runs, agent: agentStatus };
+  const restartPending = Number(
+    (await d.get(
+      `SELECT COUNT(*) AS n FROM jobs WHERE kind = 'restart' AND status IN ('pending','claimed')`,
+    ))?.n ?? 0,
+  ) > 0;
+  return {
+    counts,
+    accounts,
+    slots,
+    sessions,
+    link_sessions: linkSessions,
+    test_sessions: testSessions,
+    jobs,
+    runs,
+    agent: agentStatus,
+    last_maintenance: maintenance[0] ?? null,
+    restart_pending: restartPending,
+  };
 }

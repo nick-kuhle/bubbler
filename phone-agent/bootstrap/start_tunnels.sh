@@ -3,12 +3,12 @@
 # the phone-side services the agent needs. Run on the laptop BEFORE starting agent.py:
 #   phone-agent/bootstrap/start_tunnels.sh
 #
-# Env: PHONE_IP (default 192.168.1.166), SSH_KEY (default /tmp/opencode/bubbler_phone_ed25519),
+# Env: PHONE_IP (default 192.168.1.166), SSH_KEY (default ~/.ssh/bubbler_phone_ed25519),
 #      SSH_USER (default mobile). The agent config.yaml must point at 127.0.0.1:27042/6000.
 set -e
 
 PHONE_IP="${PHONE_IP:-192.168.1.166}"
-SSH_KEY="${SSH_KEY:-/tmp/opencode/bubbler_phone_ed25519}"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/bubbler_phone_ed25519}"
 SSH_USER="${SSH_USER:-mobile}"
 
 ssh_opts="-i $SSH_KEY -o BatchMode=yes -o ConnectTimeout=6"

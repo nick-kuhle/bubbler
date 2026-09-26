@@ -1,0 +1,27 @@
+[Unit]
+Description=bubbler phone tunnel (frida 27042 + ZXTouch 6000 over SSH)
+After=network-online.target
+Wants=network-online.target
+# The agent taps/screenshots the phone through these forwards, so the agent unit waits
+# for them instead of failing jobs on a cold tunnel.
+Before=bubbler-agent.service
+# Cap the retry rate: after 5 rapid failures systemd gives up and leaves the unit in
+# failed state, which the admin restart button and admin_test.sh can act on. These
+# directives belong in [Unit] (systemd >= 230); in [Service] they are silently ignored
+# and the unit falls back to a 10s window, which is how the old loop self-throttled.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# tunnel.sh resolves the phone IP/key and runs ssh in the foreground. It refuses to
+# start without a usable key (see ensure_phone_key.sh) — a missing key is not something
+# a restart loop can fix, so we stop hammering instead of logging 1000+ failures.
+ExecStart=/home/nickkuhle/Work/bubbler/phone-agent/bootstrap/tunnel.sh
+Environment=PHONE_IP=192.168.1.166
+Environment=SSH_USER=mobile
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

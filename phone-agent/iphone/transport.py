@@ -8,6 +8,7 @@ attaches to the already-installed app and calls the small Objective-C bridge in
 from __future__ import annotations
 
 import logging
+import os
 import socket
 import subprocess
 import time
@@ -144,7 +145,7 @@ class FridaTouch:
     def __init__(self, bundle_id: str, host: str = "127.0.0.1", port: int = 27042,
                  touch_host: str = "127.0.0.1", touch_port: int = 6000,
                  timeout: float = 30, ssh_host: str = "", ssh_user: str = "mobile",
-                 ssh_key: str = "/tmp/opencode/bubbler_phone_ed25519"):
+                 ssh_key: str = "~/.ssh/bubbler_phone_ed25519"):
         self.bundle_id = bundle_id
         self.host = host
         self.port = int(port)
@@ -159,7 +160,10 @@ class FridaTouch:
         # so app control falls back to local `uiopen`/`killall`.
         self.ssh_host = str(ssh_host or "")
         self.ssh_user = str(ssh_user or "mobile")
-        self.ssh_key = Path(str(ssh_key)) if ssh_key else None
+        # expanduser: config.yaml may carry a "~/.ssh/..." key path, and Path() does not
+        # expand "~" — without this the key silently "does not exist" and app control
+        # falls back to a local `uiopen` that the laptop does not have.
+        self.ssh_key = Path(os.path.expanduser(str(ssh_key))) if ssh_key else None
 
     def _ensure_script(self):
         if self._script is not None:
@@ -234,12 +238,24 @@ class FridaTouch:
             raise FridaDown(f"transport configured for {self.bundle_id}, not {bundle_id}")
         close_app(bundle_id, host=self.ssh_host, user=self.ssh_user, key=self.ssh_key)
         time.sleep(0.5)
-        cmd = ["uiopen", "--bundleid", bundle_id]
-        if self.ssh_key is not None and self.ssh_key.exists() and self.ssh_host:
+        if self.ssh_host:
+            # Laptop mode: drive the phone over SSH. A configured-but-missing key used
+            # to fall through to a local `uiopen` that does not exist on the laptop,
+            # which surfaced as an opaque "[Errno 2] No such file or directory: 'uiopen'"
+            # on every job. Fail with the actual cause and the fix instead.
+            if self.ssh_key is None or not self.ssh_key.exists():
+                raise FridaDown(
+                    f"laptop mode needs the phone SSH key at {self.ssh_key}; "
+                    "run phone-agent/bootstrap/ensure_phone_key.sh --print-pub, "
+                    "authorize it on the phone, then restart bubbler-tunnel"
+                )
             cmd = ["ssh", "-i", str(self.ssh_key), "-o", "BatchMode=yes",
-                   "-o", "ConnectTimeout=6",
+                   "-o", "IdentitiesOnly=yes", "-o", "ConnectTimeout=6",
                    f"{self.ssh_user}@{self.ssh_host}",
                    f"uiopen --bundleid {bundle_id}"]
+        else:
+            # On-device (cutover): uiopen is local to the phone.
+            cmd = ["uiopen", "--bundleid", bundle_id]
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def wait_for_template(self, template_name: str, timeout: float = 30) -> bool:

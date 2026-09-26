@@ -18,7 +18,7 @@ phone:
   # (cutover) leave these empty/unset so the agent uses local uiopen/killall.
   ssh_host: ""                # e.g. 192.168.x.x when the brain runs on this laptop
   ssh_user: mobile
-  ssh_key: /tmp/opencode/bubbler_phone_ed25519
+  ssh_key: ~/.ssh/bubbler_phone_ed25519
 
 vision:
   enabled: false                  # set true after calibration assets are captured

@@ -4,7 +4,7 @@
 #   phone-agent/bootstrap/phone_health.sh
 # Env: PHONE_IP/SSH_KEY/SSH_USER like start_tunnels.sh.
 PHONE_IP="${PHONE_IP:-192.168.1.166}"
-SSH_KEY="${SSH_KEY:-/tmp/opencode/bubbler_phone_ed25519}"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/bubbler_phone_ed25519}"
 SSH_USER="${SSH_USER:-mobile}"
 ssh_opts="-i $SSH_KEY -o BatchMode=yes -o ConnectTimeout=6"
 

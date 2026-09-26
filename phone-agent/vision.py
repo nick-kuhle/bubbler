@@ -82,7 +82,7 @@ def find_template(screen_png: bytes, template_name: str, library: TemplateLibrar
 
 
 def ocr_region(screen_png: bytes, roi: tuple[int, int, int, int],
-               tesseract_cmd: str) -> str:
+               tesseract_cmd: str, upscale: int = 1, psm: int = 7) -> str:
     """OCR (tesseract) a region as (x, y, w, h); returns raw text, e.g. '2d 23h'."""
     import numpy as np
     cv2 = _cv2()
@@ -93,7 +93,13 @@ def ocr_region(screen_png: bytes, roi: tuple[int, int, int, int],
         return ""
     x, y, w, h = roi
     crop = screen[y:y + h, x:x + w]
-    return pytesseract.image_to_string(crop, config="--psm 7").strip()
+    if crop.size == 0:
+        return ""
+    if upscale > 1:
+        crop = cv2.resize(crop, (crop.shape[1] * upscale, crop.shape[0] * upscale),
+                          interpolation=cv2.INTER_CUBIC)
+    return pytesseract.image_to_string(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY),
+                                       config=f"--psm {int(psm)}").strip()
 
 
 def parse_shield_countdown(text: str) -> float:

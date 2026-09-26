@@ -50,6 +50,10 @@ log = logging.getLogger("bubbler.agent")
 __version__ = "0.3.0"
 
 
+class RelaunchRequested(Exception):
+    """Raised after an operator-requested repair so the loop exits for the supervisor."""
+
+
 class ConfiguredVision:
     """Bind the stateless vision helpers to this device's template library."""
 
@@ -60,8 +64,8 @@ class ConfiguredVision:
     def find_template(self, screen: bytes, template: str):
         return find_template(screen, template, self.library)
 
-    def ocr_region(self, screen: bytes, roi):
-        return ocr_region(screen, roi, self.tesseract_cmd)
+    def ocr_region(self, screen: bytes, roi, **kwargs):
+        return ocr_region(screen, roi, self.tesseract_cmd, **kwargs)
 
     @staticmethod
     def parse_shield_countdown(text: str) -> float:
@@ -258,6 +262,15 @@ class CloudClient:
         )
         r.raise_for_status()
 
+    def report_maintenance(self, payload: dict) -> None:
+        log.info("maintenance %s: %s", payload.get("job_id"), payload.get("status"))
+        r = self._http().post(
+            f"{self.base_url}/api/agent/maintenance",
+            json=payload,
+            timeout=30,
+        )
+        r.raise_for_status()
+
 
 class CodeRelay:
     """Bridges `link` events and the following `code` events via a queue."""
@@ -307,7 +320,7 @@ def make_components(cfg: dict):
         touch_port=int(phone.get("zxtouch_port", 6000)),
         ssh_host=str(phone.get("ssh_host", "") or ""),
         ssh_user=str(phone.get("ssh_user", "mobile") or "mobile"),
-        ssh_key=str(phone.get("ssh_key", "/tmp/opencode/bubbler_phone_ed25519")),
+        ssh_key=str(phone.get("ssh_key", "~/.ssh/bubbler_phone_ed25519")),
     )
     transport.configure_templates(str(phone.get(
         "zxtouch_template_dir",
@@ -464,8 +477,15 @@ def handle_event(cloud: CloudClient, evony: EvonyController, relay: CodeRelay | 
     payload = event.get("payload") or {}
     start = time.monotonic()
 
-    if kind not in ("run", "link", "code", "test"):
+    if kind not in ("run", "link", "code", "test", "restart"):
         log.warning("ignoring unknown event kind: %s", kind)
+        return
+
+    if kind == "restart":
+        # Deferred (phone busy): keep this process and the claimed job so the lease
+        # redelivers it. Only relaunch once the repair actually ran.
+        if run_restart(cloud, event, cfg):
+            raise RelaunchRequested()
         return
 
     if kind == "code":
@@ -518,6 +538,59 @@ def handle_event(cloud: CloudClient, evony: EvonyController, relay: CodeRelay | 
     log.info("run reported: %s (job %s)", report["status"], event.get("job_id"))
 
 
+def run_restart(cloud: CloudClient, event: dict, cfg: dict) -> bool:
+    """Operator-requested stack repair (the War Room "restart agent" button).
+
+    Runs the recovery in phone-agent/repair.py — the tunnel/phone-service fix — then
+    reports the outcome. The caller exits afterwards so the supervisor relaunches us with
+    a clean process, which is the same relaunch path the watchdog already uses.
+
+    Returns False only when the repair was deferred, so the caller can keep the process
+    (and its claimed job) alive for redelivery instead of relaunching for nothing.
+    """
+    from repair import repair as run_repair
+
+    log.info("restart requested (job %s) — repairing the stack", event.get("job_id"))
+    # Re-opening the tunnels would cut the phone out from under an in-flight run or link,
+    # so take the same device lock the game flows use. If it is busy we deliberately do
+    # NOT report: the job stays claimed and the cloud lease redelivers it in 90s.
+    if not _device_lock.acquire(blocking=False):
+        log.warning("phone busy with another flow; deferring the restart repair")
+        return False
+    try:
+        report = run_repair(cfg)
+    except Exception as exc:  # a broken repair must not wedge the loop
+        log.exception("repair crashed")
+        _safe_maintenance_report(cloud, {
+            "job_id": event.get("job_id"),
+            "status": "failed",
+            "error": f"repair crashed: {exc}"[:500],
+            "steps": [],
+        })
+        # A clean process is the fix for a crashed repair, so still ask for the relaunch.
+        return True
+    finally:
+        _device_lock.release()
+    for step in report.steps:
+        log.info("  repair %s: %s %s", step.name, "ok" if step.ok else "FAILED", step.detail)
+    _safe_maintenance_report(cloud, {
+        "job_id": event.get("job_id"),
+        "status": "ok" if report.ok else "failed",
+        "error": report.error,
+        "steps": [s.__dict__ for s in report.steps],
+        "duration_ms": report.duration_ms,
+    })
+    log.info("repair %s — exiting for supervisor relaunch", "done" if report.ok else "INCOMPLETE")
+    return True
+
+
+def _safe_maintenance_report(cloud: CloudClient, payload: dict) -> None:
+    try:
+        cloud.report_maintenance(payload)
+    except Exception as exc:
+        log.warning("could not report maintenance result: %s", exc)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="bubbler on-device agent")
     parser.add_argument("--once", action="store_true", help="one long-poll round, then exit")
@@ -566,7 +639,13 @@ def main() -> None:
         last_activity = time.monotonic()
 
         if event:
-            handle_event(cloud, evony, relay, event, cfg, wait_link=args.once)
+            try:
+                handle_event(cloud, evony, relay, event, cfg, wait_link=args.once)
+            except RelaunchRequested:
+                # Reported already; systemd Restart=always / launchd KeepAlive brings us
+                # back with fresh sockets (the repair just re-opened the tunnels).
+                log.info("restarting agent for operator-requested repair")
+                sys.exit(0)
             last_activity = time.monotonic()
         if args.once:
             break

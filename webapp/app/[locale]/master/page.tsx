@@ -21,6 +21,8 @@ type Overview = {
   jobs: Job[];
   runs: Run[];
   agent: Agent;
+  last_maintenance: Maintenance | null;
+  restart_pending: boolean;
 };
 type Account = {
   id: string; email: string; evony_name: string; is_operator: number; linked: number;
@@ -33,6 +35,7 @@ type LinkSession = { id: string; user_id: string; email: string; state: string; 
 type TestSession = { id: string; user_id: string; email: string; state: string; error: string | null; verified: number | null; created_at: string };
 type Job = { id: string; kind: string; status: string; user_id: string; email: string; created_at: string; claimed_at: string | null };
 type Run = { id: string; trigger: string; status: string; shield_hours_remaining: number | null; evidence_ref: string | null; error: string | null; duration_ms: number | null; created_at: string; evony_name: string };
+type Maintenance = { id: string; status: string; error: string | null; duration_ms: number | null; created_at: string };
 
 // member view (read-only roster)
 type RosterRow = { name: string; bubble_hours_remaining: number | null; next_bubble: { weekday: number; time: string } | null };
@@ -115,6 +118,35 @@ export default function Master() {
     }
   }
 
+  /** Operator-requested stack repair. The agent is the only thing that can do the work
+   *  (Vercel cannot reach the laptop), so this queues a `restart` event that the agent
+   *  picks up on its next long-poll. Lives here because it needs Master()'s notice state. */
+  const restartAgent = async () => {
+    if (!window.confirm("Restart the agent?\n\nThis re-opens the phone tunnels (frida + ZXTouch), starts the phone services if they are down, and then relaunches the agent. An in-flight bubble run is deferred, not cancelled.")) return;
+    setBusyAction("restart");
+    setNotice(null);
+    try {
+      const r = await fetch("/api/admin/agent/restart", { method: "POST" });
+      const body = (await r.json().catch(() => ({}))) as {
+        ok?: boolean; error?: string; already_pending?: boolean; agent_online?: boolean;
+      };
+      if (!r.ok || !body.ok) {
+        setNotice({ kind: "err", text: `restart failed — ${body.error ?? r.status}` });
+      } else if (body.agent_online === false) {
+        setNotice({ kind: "err", text: "agent is offline, so it cannot pick this up. Wake the phone and check the agent service, then try again." });
+      } else if (body.already_pending) {
+        setNotice({ kind: "ok", text: "a repair is already in flight — the agent will run it on its next poll (within ~46s)." });
+      } else {
+        setNotice({ kind: "ok", text: "restart queued — the agent repairs the tunnels and relaunches on its next poll (within ~46s)." });
+      }
+      await load();
+    } catch (e) {
+      setNotice({ kind: "err", text: `restart failed — ${e instanceof Error ? e.message : "unknown"}` });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
   if (error) {
     return (
       <section className="card warn">
@@ -130,7 +162,16 @@ export default function Master() {
   if (data.role === "member") {
     return <RosterView data={data} />;
   }
-  return <AdminView data={data} busyAction={busyAction} notice={notice} act={act} refresh={() => void load()} />;
+  return (
+    <AdminView
+      data={data}
+      busyAction={busyAction}
+      notice={notice}
+      act={act}
+      refresh={() => void load()}
+      restartAgent={restartAgent}
+    />
+  );
 }
 
 function RosterView({ data }: { data: Roster }) {
@@ -185,12 +226,14 @@ function AdminView({
   notice,
   act,
   refresh,
+  restartAgent,
 }: {
   data: Overview;
   busyAction: string | null;
   notice: Notice;
   act: (key: string, fn: () => Promise<Response>, okText: string) => Promise<void>;
   refresh: () => void;
+  restartAgent: () => Promise<void>;
 }) {
   const bubble = (a: Account) =>
     act(`bubble:${a.id}`, () => fetch("/api/runs/now", {
@@ -276,10 +319,27 @@ function AdminView({
           </p>
           {data.agent && !data.agent.online && (
             <p className="warn" style={{ margin: "0.4rem 0 0" }}>
-              quiet for {ago(data.agent.offline_for_ms)} with no heartbeat — wake the phone and check the agent.
+              quiet for {ago(data.agent.offline_for_ms)} with no heartbeat — wake the phone, check the agent
+              service, then use &ldquo;restart agent&rdquo; below.
             </p>
           )}
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.8rem" }}>
+          {data.last_maintenance && (
+            <p className={data.last_maintenance.status === "ok" ? "ok" : "warn"} style={{ margin: "0.4rem 0 0" }}>
+              last repair {fmt(data.last_maintenance.created_at)} —{" "}
+              {data.last_maintenance.status === "ok" ? "repaired" : "needs attention"}
+              {data.last_maintenance.error ? `: ${data.last_maintenance.error}` : ""}
+            </p>
+          )}
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.8rem", alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={() => void restartAgent()}
+              disabled={busyAction === "restart" || data.restart_pending}
+              title="Re-open the phone tunnels, start the phone services if they are down, then relaunch the agent"
+            >
+              {busyAction === "restart" ? "restarting…" : data.restart_pending ? "repair in flight…" : "↻ restart agent"}
+            </button>
+            {data.restart_pending && <span className="badge warn">waiting for the agent to poll</span>}
             <span className="badge">users {data.counts.users}</span>
             <span className="badge">sessions {data.counts.sessions}</span>
             <span className={`badge ${data.counts.jobs_pending ? "warn" : "ok"}`}>jobs {data.counts.jobs} · {data.counts.jobs_pending} active</span>

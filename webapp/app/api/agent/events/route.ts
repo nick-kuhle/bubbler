@@ -10,17 +10,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyBearer } from "@/lib/auth";
 import { fillDue, claimPlayable } from "@/lib/scheduler";
 import { touchAgentHealth } from "@/lib/agentHealth";
+import { publicError } from "@/lib/publicError";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // Hobby cap is 60s; our holds fit well under it.
 export const maxDuration = 60;
-
-function publicError(err: unknown): string {
-  return String(err instanceof Error ? err.message : err)
-    .replace(/postgres(?:ql)?:\/\/[^@\s]+@/g, "postgres://***@")
-    .slice(0, 240);
-}
 
 export async function GET(req: NextRequest) {
   try {

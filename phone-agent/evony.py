@@ -1014,14 +1014,22 @@ class EvonyController:
         roi = spec.get("name_roi")
         if not roi or len(roi) != 4:
             return None
+        x, y, w, h = (int(v) for v in roi)
+        box = (max(0, x - 60), max(0, y - 40), w + 200, h + 90)
         for attempt in range(checks):
             try:
                 shot = self.t.screenshot()
-                text = self.v.ocr_region(shot, tuple(int(v) for v in roi))
+                text = self.v.ocr_region(shot, box, upscale=2, psm=6)
             except Exception as exc:
                 log.warning("load-account name OCR failed: %s", exc)
                 return None
-            text = re.sub(r"^.*\baccount\b\s*", "", text.strip().rstrip("?!.")).strip()
+            # Keep only the trailing name token(s) after the last
+            # 'account'/'cuenta' marker (localized dialogs), drop trailing numbers.
+            text = re.sub(r"^.*\b(?:account|cuenta|los)\s+", "",
+                          text.strip().rstrip("?!."), flags=re.I | re.S).strip()
+            text = re.sub(r"\s+\d+\s*.*$", "", text).strip()
+            if re.search(r"\b(?:account|cuenta)\b", text, re.I):
+                text = ""  # marker still present: the strip did not resolve
             if self._plausible_name(text):
                 return text
             if attempt + 1 < checks:
@@ -1040,12 +1048,14 @@ class EvonyController:
         return bool(re.search(r"[A-Za-z]{2,}", text))
 
     def _accept_load_confirm(self, expected_name: str | None) -> tuple[bool, str | None]:
-        """Verify the load-account name (when known + calibratable) and tap Confirm.
+        """Verify the load-account name (approximately) and tap Confirm.
 
-        Returns (ok, confirmed_name). Like _accept_login_prompt: when the name
-        cannot be read we proceed unverified, because merely *seeing* the dialog
-        proves the typed email was accepted. A readable name that mismatches the
-        expected member is the only hard refusal.
+        Returns (ok, confirmed_name). The dialog appearing is what proves the typed
+        email was accepted — the name is only an approximate identity check, because
+        Evony names freely mix emojis/special characters and change over time. We
+        refuse only when the readable name is CLEARLY a different account (very low
+        similarity); close matches report the name, and weak/unreadable reads proceed
+        unverified (confirmed_name=None).
         """
         name = self._load_confirm_name(checks=3, interval=0.6)
         if name is None:
@@ -1053,13 +1063,22 @@ class EvonyController:
                         "or unreadable frame); proceeding unverified")
             self._confirm_load_account()
             return True, None
-        if expected_name and not _names_match(name, expected_name):
-            log.warning("load-account name '%s' does NOT match expected '%s'; refusing",
-                        name, expected_name)
-            return False, name
-        log.info("load-account name '%s'%s", name,
-                 f" matches expected '{expected_name}'"
-                 if expected_name else " (no expected check)")
+        if expected_name:
+            sim = _names_similarity(name, expected_name)
+            if sim < NAME_MISMATCH_SIM:
+                log.warning("load-account name '%s' is NOT approximately expected "
+                            "'%s' (similarity %.2f); refusing", name, expected_name, sim)
+                return False, name
+            if sim < NAME_CONFIRM_SIM:
+                log.warning("load-account name '%s' only weakly resembles expected "
+                            "'%s' (similarity %.2f); proceeding unverified",
+                            name, expected_name, sim)
+                self._confirm_load_account()
+                return True, None
+            log.info("load-account name '%s' approximately matches expected '%s' "
+                     "(similarity %.2f)", name, expected_name, sim)
+        else:
+            log.info("load-account name '%s' (no expected check)", name)
         self._confirm_load_account()
         return True, name
 
@@ -1105,6 +1124,15 @@ class EvonyController:
         log.info("login icon presses (px): %s", points)
         if bundle_id:
             self.t.launch(bundle_id)
+            # blind presses keep the exact switch-account icon position (56, 250),
+            # verified to open the dialog when the loading screen shows it
+            early_end = time.monotonic() + 4.0
+            while time.monotonic() < early_end:
+                try:
+                    self.t.press(56, 250, hold=0.4)
+                except Exception as exc:
+                    log.warning("early login press failed: %s", exc)
+                time.sleep(0.8)
         start = time.monotonic()
         deadline = start + LOGIN_GRACE_S
         last_tap = 0.0
@@ -1179,34 +1207,61 @@ class EvonyController:
             log.info("dialog up; waiting before email")
             time.sleep(1.8)
             log.info("entering email (len=%d)", len(email))
-            self._enter_email(email)
-            return self._finish_test_login(expected_name or "")
+            pre: dict = {}
+
+            def _snapshot_dialog():
+                pre["sig"] = self._dialog_signature(self._grab())
+
+            self._enter_email(email, after_type=_snapshot_dialog)
+            return self._finish_test_login(expected_name or "", pre.get("sig"))
         except CalibrationMissing as extra:
             return {"status": "failed", "error": f"calibration: {extra}"}
 
-    def _finish_test_login(self, expected_name: str) -> dict:
-        prompt_name: str | None = None
-        state = self._post_email_state(20.0)
-        if state == "needs_code":
+    def _finish_test_login(self, expected_name: str, pre_sig=None) -> dict:
+        # Mirror the confirmed link flow exactly: after the email confirm Evony
+        # either asks for the dark load-account confirm (identity gate) or re-links.
+        state = self._wait_for_post_email_state(20.0, pre_sig)
+        if state == "code":
             return {"status": "failed",
                     "error": "session revoked or new device — re-link from the wizard"}
-        if state == "login_prompt":
-            matched, prompt_name = self._accept_login_prompt(expected_name)
-            if not matched:
+        if state == "email":
+            log.info("still on email entry; retrying confirm tap")
+            pre_sig = self._dialog_signature(self._grab())
+            self._tap_email_confirm()
+            state = self._wait_for_post_email_state(20.0, pre_sig)
+            if state == "code":
                 return {"status": "failed",
-                        "error": f"login would reach a different account: {prompt_name or 'unknown'}"}
-            if not self._wait_parchment_gone(25.0):
-                return {"status": "failed", "error": "login confirm did not complete"}
-        elif state == "world":
-            log.info("already on the world view after email confirm")
-        elif state == "unknown":
-            return {"status": "failed",
-                    "error": "could not reach the Evony login result after email confirm"}
-        else:  # pragma: no cover — exhaustive
+                        "error": "session revoked or new device — re-link from the wizard"}
+            if state != "load":
+                return {"status": "failed",
+                        "error": "email confirm did not advance past email entry"}
+        if state == "none":
+            if self._wait_for_load_confirm(12.0):
+                state = "load"
+            elif self._wait_for_world(20.0):
+                self._snap("world")
+                return {"status": "failed",
+                        "error": "world reached without a login-prompt; account switch "
+                                 "unverified (previous user may still be logged in)"}
+            else:
+                return {"status": "failed",
+                        "error": "no confirmation dialog after email confirm"}
+        if state != "load":
             return {"status": "failed", "error": "unexpected post-email state"}
 
-        # Post-login identity double-check: open the profile and read the name.
-        verified = state == "login_prompt" and bool(prompt_name)
+        matched, prompt_name = self._accept_load_confirm(expected_name or "")
+        if not matched:
+            return {"status": "failed",
+                    "error": f"login would reach a different account: {prompt_name or 'unknown'}"}
+        self._snap("post_load_confirm")
+        if not self._wait_for_world(60.0):
+            if self._code_dialog_visible():
+                return {"status": "failed",
+                        "error": "session revoked or new device — re-link from the wizard"}
+            return {"status": "failed", "error": "world view not reached after login confirm"}
+        self._snap("world")
+
+        verified = bool(prompt_name) and bool(expected_name)
         profile = self._profile_verification(expected_name, verified)
         confirmed = profile.get("confirmed_name") or prompt_name or None
         result = {"status": "ok", "verified": bool(profile.get("verified", verified))}
@@ -1214,7 +1269,6 @@ class EvonyController:
             result["confirmed_name"] = confirmed
         err = profile.get("error")
         if err:
-            # Profile confirmed a *different* account: we are on the wrong profile.
             result = {"status": "failed", "error": err}
         return result
 
@@ -1264,7 +1318,7 @@ class EvonyController:
                         "proceeding unverified")
             self._confirm_load_account()
             return True, None
-        if _names_match(prompt_name, expected_name):
+        if _names_approx(prompt_name, expected_name):
             log.info("login prompt name '%s' matches expected '%s'", prompt_name, expected_name)
             self._confirm_load_account()
             return True, prompt_name
@@ -1311,11 +1365,15 @@ class EvonyController:
             return {"verified": fallback_verified}
         if not text:
             return {"verified": fallback_verified}
-        if _names_match(text, expected_name):
+        if _names_approx(text, expected_name):
             log.info("profile name '%s' matches expected '%s'", text, expected_name)
             return {"verified": True, "confirmed_name": text}
         return {"verified": False, "confirmed_name": text,
                 "error": f"profile shows a different account: {text}"}
+
+
+NAME_MISMATCH_SIM = 0.35  # below this the readable name is clearly another account -> refuse
+NAME_CONFIRM_SIM = 0.5    # at/above this an approximate match confirms the identity
 
 
 def _names_match(a: str | None, b: str | None) -> bool:
@@ -1324,6 +1382,35 @@ def _names_match(a: str | None, b: str | None) -> bool:
         return "".join(ch.lower() for ch in str(s or "") if ch.isalnum())
     x, y = norm(a), norm(b)
     return bool(x) and x == y
+
+
+def _names_similarity(a: str | None, b: str | None) -> float:
+    """Approximate name similarity in [0, 1] after stripping emoji/punctuation noise.
+
+    Evony names freely use emojis and special characters, so a stored "preferred
+    name" can never be expected to match the in-game glyphs exactly. Normalizing to
+    plain alphanumerics (dropping emojis, spaces and punctuation) first makes close
+    variants like 'Nick⚔️'/'Nick 1'/'NICK' comparable; difflib handles the rest.
+    """
+    import difflib
+
+    def norm(s) -> str:
+        return "".join(ch.lower() for ch in str(s or "") if ch.isalnum())
+
+    x, y = norm(a), norm(b)
+    if not x or not y:
+        return 0.0
+    if x == y:
+        return 1.0
+    if x in y or y in x:
+        return 0.9  # OCR dropped/reordered chars
+    return difflib.SequenceMatcher(None, x, y).ratio()
+
+
+def _names_approx(a: str | None, b: str | None,
+                  threshold: float = NAME_CONFIRM_SIM) -> bool:
+    """Approximate name match (default confirm threshold)."""
+    return _names_similarity(a, b) >= threshold
 
 
 def _best_shot(evony: EvonyController):

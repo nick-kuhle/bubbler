@@ -21,7 +21,7 @@ set -u
 
 BASE_URL="${BASE_URL:-https://bubbler-eta.vercel.app}"
 PHONE_IP="${PHONE_IP:-192.168.1.166}"
-SSH_KEY="${SSH_KEY:-/tmp/opencode/bubbler_phone_ed25519}"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/bubbler_phone_ed25519}"
 SSH_USER="${SSH_USER:-mobile}"
 
 HERE="$(CDPATH= cd "$(dirname "$0")" && pwd)"
